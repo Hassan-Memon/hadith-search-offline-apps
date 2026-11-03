@@ -371,3 +371,35 @@ test('static data: a failed snapshot is an error, not a partial sync', async () 
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test('a hadith that briefly answers 404 is retried; one that keeps failing stops the run', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tq-build-404-'));
+  try {
+    const site = { docs: makeDocs(6), calls: [] as string[] };
+    const pub = { dir: null as string | null };
+    const inner = fakeFetch(site, pub);
+    const misses = new Map<string, number>([['id2', 2]]); // two 404s, then fine
+    const flaky = (async (input: string | URL | Request) => {
+      const url = String(input instanceof Request ? input.url : input);
+      for (const [id, left] of misses) {
+        if (url.endsWith(`/api/hadees-detail/${id}`) && left > 0) {
+          misses.set(id, left - 1);
+          return new Response('not found', { status: 404 });
+        }
+      }
+      return inner(input);
+    }) as typeof fetch;
+
+    const ok = await buildData({ site: SITE, prevBase: PUB, outDir: join(root, 'b1'), fetch: flaky, retryDelayMs: 1 });
+    assert.equal(ok.total, 6);
+
+    misses.set('id4', 99); // never comes back
+    await assert.rejects(
+      buildData({ site: SITE, prevBase: undefined, outDir: join(root, 'b2'), fetch: flaky, retryDelayMs: 1 }),
+      /HTTP 404 .*id4/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

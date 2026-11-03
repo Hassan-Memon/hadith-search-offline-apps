@@ -48,6 +48,10 @@ export interface BuildOptions {
   log?: (message: string) => void;
   now?: () => Date;
   userAgent?: string;
+  /** Parallel /api/hadees-detail requests (default 1, gentle on the website). */
+  detailConcurrency?: number;
+  /** Base delay between retries (tests use a small value). */
+  retryDelayMs?: number;
 }
 
 export interface BuildResult {
@@ -83,16 +87,21 @@ class ClientError extends Error {
   }
 }
 
-/** Retries network errors and 5xx; a 4xx answer will not change, so it fails at once. */
-async function withRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+/**
+ * Retries network errors and 5xx. A 4xx usually will not change, so it fails
+ * at once, unless retryNotFound is set: the website answers 404 for a hadith
+ * whenever its search engine has a short hiccup (Django turns the error into
+ * an empty answer), so a 404 for a hadith the list just named is retried.
+ */
+async function withRetry<T>(fn: () => Promise<T>, tries = 3, retryNotFound = false, delayMs = 1000): Promise<T> {
   let last: unknown;
   for (let i = 0; i < tries; i++) {
     try {
       return await fn();
     } catch (error) {
-      if (error instanceof ClientError) throw error;
+      if (error instanceof ClientError && !(retryNotFound && error.status === 404)) throw error;
       last = error;
-      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+      if (i < tries - 1) await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
     }
   }
   throw last;
@@ -169,15 +178,20 @@ export async function buildData(o: BuildOptions): Promise<BuildResult> {
   const now = nowDate.toISOString();
   const headers = { Accept: 'application/json', 'User-Agent': o.userAgent ?? DEFAULT_UA };
 
-  const getJson = <T>(url: string) =>
-    withRetry(async () => {
-      const res = await f(url, { headers });
-      if (!res.ok) {
-        const message = `HTTP ${res.status} for ${url}`;
-        throw res.status < 500 ? new ClientError(message, res.status) : new Error(message);
-      }
-      return (await res.json()) as T;
-    });
+  const getJson = <T>(url: string, retryNotFound = false) =>
+    withRetry(
+      async () => {
+        const res = await f(url, { headers });
+        if (!res.ok) {
+          const message = `HTTP ${res.status} for ${url}`;
+          throw res.status < 500 ? new ClientError(message, res.status) : new Error(message);
+        }
+        return (await res.json()) as T;
+      },
+      retryNotFound ? 5 : 3,
+      retryNotFound,
+      o.retryDelayMs ?? 1000,
+    );
   const getBytes = (url: string) =>
     withRetry(async () => {
       const res = await f(url, { headers: { 'User-Agent': headers['User-Agent'] } });
@@ -271,8 +285,13 @@ export async function buildData(o: BuildOptions): Promise<BuildResult> {
       );
     }
 
-    const fetched = await mapLimit(candidates, concurrency, async (id) => {
-      const raw = await getJson<HadithDoc & { related?: unknown }>(`${site}/api/hadees-detail/${encodeURIComponent(id)}`);
+    // One at a time: each detail request also makes the website run a
+    // "related hadith" search, and its search engine is small.
+    const fetched = await mapLimit(candidates, o.detailConcurrency ?? 1, async (id) => {
+      const raw = await getJson<HadithDoc & { related?: unknown }>(
+        `${site}/api/hadees-detail/${encodeURIComponent(id)}`,
+        true,
+      );
       const { related: _related, ...doc } = raw;
       const problem = validateDocument(doc, id);
       return { id, doc: problem ? null : slimDocument(doc), problem };
