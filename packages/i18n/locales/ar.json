@@ -1,0 +1,440 @@
+{
+  "site": {
+    "title": "تحقیقات الحديث",
+    "description": "تحقیقات الحديث منصة للبحث في الحديث."
+  },
+  "navigation": {
+    "home": "الرئيسية",
+    "search-hadees": "بحث الحديث",
+    "books": "الكتب",
+    "all-hadees": "جميع الأحاديث",
+    "add-hadees": "مدخل الحديث",
+    "add-announcements": "مدخل الإعلانات",
+    "about": "تعريف"
+  },
+  "homePage": {
+    "title": "الصفحة الرئيسية",
+    "books": "تحميل الكتب",
+    "all-hadees": "جميع الأحاديث",
+    "all-hadees-here": "جميع الأحاديث هنا",
+    "hero-title": "محرك بحث تحقيقي في الروايات غير المعتبرة وعلوم الحديث",
+    "books-description": "جميع الكتب التي تحتاجها.",
+    "all-hadees-description": "جميع الأحاديث هنا.",
+    "search-any-hadees-description": "البحث عن أي حديث هنا.",
+    "search-hadees": "بحث الحديث",
+    "description": "محرك بحث للأحاديث المختلفة والأحاديث المختلقة والأحاديث المطروحة والأحاديث الضعيفة والأحاديث المرفوعة، متاح للكمبيوتر والجوال. بالإضافة إلى ذلك، يشمل أبحاث أخرى في الأحاديث وعلوم الأحاديث."
+  },
+  "addAnnouncements": {
+    "title": "مدخل الإعلانات",
+    "description": "مدخل الإعلانات",
+    "tabs": {
+      "pop-over": "پوپ آور",
+      "text-banner": "بینر الكتابة"
+    },
+    "announcementForm": {
+      "title": "إنشاء إعلان جديد",
+      "typeLabel": "نوع الإعلان",
+      "typePlaceholder": "اختر نوع الإعلان",
+      "textType": "إعلان نصي",
+      "imageType": "إعلان صورة",
+      "titleLabel": "عنوان الإعلان (اختياري)",
+      "titlePlaceholder": "أدخل عنوان الإعلان",
+      "contentLabel": "محتوى الإعلان",
+      "contentPlaceholder": "أدخل محتوى الإعلان",
+      "imageUrlLabel": "رابط الصورة",
+      "imageUrlPlaceholder": "أدخل رابط الصورة",
+      "addButton": "إضافة إعلان",
+      "success": "تم إضافة الإعلان بنجاح!",
+      "error": "فشل في إضافة الإعلان. يرجى المحاولة مرة أخرى.",
+      "bookLabel": "اختر الكتاب",
+      "bookPlaceholder": "اختر كتاباً لهذا الإعلان",
+      "validation": {
+        "typeRequired": "نوع الإعلان مطلوب",
+        "bookRequired": "اختيار الكتاب مطلوب",
+        "titleTooLong": "العنوان طويل جداً (الحد الأقصى 200 حرف)",
+        "contentTooLong": "المحتوى طويل جداً (الحد الأقصى 1000 حرف)",
+        "imageUrlInvalid": "يرجى إدخال رابط صورة صحيح",
+        "requiredFields": "للإعلانات النصية، العنوان أو المحتوى مطلوب. للإعلانات المصورة، رابط الصورة مطلوب."
+      },
+      "errors": {
+        "announcementAlreadyExists": "يمكنك إنشاء إعلان واحد فقط من نوع {type} في وقت واحد."
+      },
+      "noAnnouncementsFound": "لا يوجد إعلانات",
+      "AnnouncementsTitle": "إعلانات نصية"
+    }
+  },
+  "searchHadees": {
+    "title": "البحث في الأحاديث",
+    "description": "ملاحظة: أي كلمة مكتوبة للبحث، حتى لو لم تكن موجودة في النص العربي أو الأردي للحديث، ستساعد في الوصول إلى الحديث المطلوب إذا كانت موجودة في البحث التفصيلي للحديث.",
+    "searchPlaceholder": "كلمات الحديث ...",
+    "searchButton": "بحث",
+    "searchLoading": "بحث متقدم",
+    "resultsNumber": "من أصل",
+    "resultsRange": "{from}–{to} من أصل {total} نتائج",
+    "resultsFound": "نتائج",
+    "searchEmptyError": "اكتب كلمات الحديث للبحث.",
+    "searchError": "البحث غير متاح مؤقتًا. يرجى المحاولة مرة أخرى لاحقًا.",
+    "bookByPlaceholder": "اختر كتاباً...",
+    "allBooks": "جميع الكتب",
+    "loadingBooks": "جاري تحميل الكتب...",
+    "noResultsFound": "لا يوجد نتائج",
+    "clear": "مسح",
+    "resultsCount": "{total} نتيجة",
+    "noResultsHint": "جرّب كلمات أقل أو مختلفة، أو أزل تصفية الكتاب.",
+    "browseBooks": "تصفح الكتب",
+    "browseAll": "جميع الأحاديث",
+    "filterBook": "الكتاب",
+    "examples": "على سبيل المثال:"
+  },
+  "detailHadees": {
+    "viewModes": {
+      "birdEyeView": "نظرة عامة",
+      "defaultView": "العرض الافتراضي",
+      "detailedView": "عرض تفصيلي"
+    },
+    "sections": {
+      "details": "التفاصيل",
+      "references": "المراجع",
+      "bookName": "اسم الكتاب",
+      "tags": "المواضيع",
+      "relatedHadith": "أحاديث ذات صلة",
+      "contents": "المحتويات"
+    },
+    "messages": {
+      "loading": "جارٍ تحميل الحديث...",
+      "error": "خطأ",
+      "notFound": "الحديث غير موجود (ID: {id})",
+      "deleteSuccess": "تم حذف الحديث بنجاح",
+      "noContent": "لم يتم العثور على محتويات",
+      "contentError": "خطأ: لم يتم العثور على المحتويات"
+    },
+    "actions": {
+      "deleteHadith": "حذف هذا الحديث",
+      "deleting": "جارٍ الحذف...",
+      "deleteError": "خطأ",
+      "deleteSuccess": "تم حذف الحديث بنجاح"
+    },
+    "breadcrumb": {
+      "home": "الرئيسية"
+    },
+    "meta": {
+      "reviewedBy": "مراجعة: {name}",
+      "updatedOn": "آخر تحديث: {date}",
+      "reviewerName": "المفتي طارق أمير خان"
+    },
+    "share": {
+      "share": "مشاركة",
+      "copyLink": "نسخ الرابط",
+      "copied": "تم نسخ الرابط",
+      "copyFailed": "تعذر نسخ الرابط"
+    }
+  },
+  "allHadees": {
+    "title": "جميع الأحاديث",
+    "loading": "جاري التحميل...",
+    "resultsCount": "من أصل",
+    "hadiths": "أحاديث",
+    "viewHadith": "عرض الحديث",
+    "noResults": "لم يتم العثور على نتائج",
+    "resultsNumber": "من أصل",
+    "resultsRange": "{from}–{to} من أصل {total} نتائج",
+    "resultsFound": "نتائج",
+    "description": "جميع الروايات المحققة. افتح أي رواية لقراءة بحثها كاملاً.",
+    "countHeading": "{total} رواية",
+    "bookHubIntro": "جميع الروايات المحققة في هذا الكتاب. افتح أي رواية لقراءة بحثها كاملاً."
+  },
+  "hadith": {
+    "collection": "مجموعة الحديث",
+    "collectionDescription": "استكشف مجموعتنا الشاملة من الأحاديث الصحيحة مع البحث المفصل والتحليل.",
+    "searchHadith": "البحث في الحديث",
+    "searchHadithDescription": "ابحث في قاعدة بيانات الحديث مع المرشحات المتقدمة.",
+    "booksDescription": "تصفح مجموعات الحديث حسب الكتب والمجلدات.",
+    "researchDescription": "الوصول إلى الأوراق البحثية والتحليل العلمي."
+  },
+  "addHadees": {
+    "title": "إضافة الحديث",
+    "description": "إدارة الكتب وإضافة تفاصيل الحديث.",
+    "tabs": {
+      "book": "كتاب",
+      "hadees": "حديث"
+    },
+    "bookForm": {
+      "label": "الرجاء إدخال اسم الكتاب الحديث، مع مراعاة التهجئة.",
+      "placeholder": "اكتب اسم الكتاب هنا",
+      "addButton": "إضافة كتاب",
+      "error": "فشل إضافة الكتاب. يرجى المحاولة مرة أخرى أو التحقق من أن الكتاب موجود بالفعل",
+      "validation": {
+        "bookNameRequired": "اسم الكتاب مطلوب",
+        "bookNameTooLong": "اسم الكتاب طويل جداً"
+      }
+    },
+    "bookList": {
+      "title": "قائمة الكتب"
+    },
+    "hadeesForm": {
+      "bookLabel": "الكتاب",
+      "titleLabel": "العنوان",
+      "hukmLabel": "الحكم",
+      "detailLabel": "التفصيل",
+      "bookPlaceHolder": "اختر كتاباً من القائمة",
+      "showPreview": "إظهار المعاينة",
+      "submitButton": "إرسال",
+      "submitting": "جاري الإرسال...",
+      "hidePreview": "إخفاء المعاينة",
+      "noBooks": "لا توجد كتب متاحة. يرجى إضافة كتاب أولاً.",
+      "validation": {
+        "bookNameRequired": "اسم الكتاب مطلوب",
+        "titleRequired": "العنوان مطلوب",
+        "previewRequired": "يرجى إنشاء معاينة قبل الإرسال",
+        "slugRequired": "الرابط المختصر مطلوب",
+        "slugLatin": "لا تستخدم الحروف الإنجليزية في الرابط المختصر",
+        "slugTooShort": "يجب ألا يقل الرابط المختصر عن {min} أحرف",
+        "slugTooLong": "يجب ألا يزيد الرابط المختصر عن {max} حرفًا"
+      },
+      "authoredAtLabel": "تاريخ المؤلف (اختياري)",
+      "authoredAtHelp": "متى تم كتابة البحث بالفعل. اتركه فارغًا لعدم إضافة تاريخ — لن يتم تخمينه من تاريخ الاستيراد.",
+      "submitSuccess": "تم إنشاء الحديث بنجاح!",
+      "submitError": "فشل في إنشاء الحديث. يرجى المحاولة مرة أخرى.",
+      "slugLabel": "الرابط المختصر (Slug)",
+      "slugPlaceholder": "مثال: حضرت جبرائیل کی چالیس ہزار سال کی عبادت",
+      "slugHelp": {
+        "what": "سلگ (لنک کا نام): یہ وہ مختصر نام ہے جو اس حدیث کے لنک (ویب ایڈریس) کے آخر میں آئے گا۔ گوگل اسی سے سمجھتا ہے کہ صفحہ کس بارے میں ہے۔",
+        "words": "حدیث کا موضوع 3 سے 8 الفاظ میں لکھیں (زیادہ سے زیادہ {max} حروف)۔ مثال: حضرت جبرائیل کی چالیس ہزار سال کی عبادت",
+        "noLabel": "شروع میں «روایت»، «حکایت» یا «حدیث» جیسے الفاظ نہ لکھیں۔",
+        "spaces": "الفاظ کے درمیان خالی جگہ چھوڑیں، وہ خود بخود «-» میں بدل جائے گی۔",
+        "noSymbols": "اعراب (زیر، زبر، پیش)، علامات (: ، ۔ \" ’) اور انگریزی حروف نہ لکھیں۔",
+        "unique": "ہر حدیث کا سلگ الگ ہونا چاہیے، اور محفوظ کرنے کے بعد اسے نہ بدلیں ورنہ پرانا لنک کام نہیں کرے گا۔"
+      }
+    }
+  },
+  "resources": {
+    "islamicBooks": "الكتب الإسلامية",
+    "islamicBooksDescription": "الوصول إلى مجموعة من الأدب الإسلامي والمراجع.",
+    "articlesDescription": "اقرأ المقالات العلمية والأوراق البحثية.",
+    "glossaryDescription": "المصطلحات الإسلامية والمصطلحات موضحة.",
+    "faqDescription": "الأسئلة الشائعة حول الحديث والدراسات الإسلامية."
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "notFound": "غير موجود",
+    "goToHome": "انتقل إلى الصفحة الرئيسية",
+    "search": "البحث",
+    "submit": "إرسال",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "view": "عرض",
+    "close": "إغلاق",
+    "next": "التالي",
+    "previous": "السابق",
+    "ok": "موافق"
+  },
+  "language": {
+    "english": "English",
+    "urdu": "اردو",
+    "arabic": "العربية"
+  },
+  "footer": {
+    "heading": "تحقيق الحديث",
+    "description": "محرك بحث لتفاصيل الأحاديث الموضوعة (المختلقة) وما لا أصل له والواهية والمطروحة، متاح للكمبيوتر والجوال. بالإضافة إلى ذلك، يشمل أبحاثاً أخرى في الحديث وعلوم الحديث.",
+    "link": "انقر هنا لإعلامنا بآرائكم القيمة.",
+    "contacts": {
+      "muftiTariqAmeerKhan": "مفتي طارق أمير خان",
+      "molanaMuhammadSaleem": "مولانا محمد سليم",
+      "email": "البريد الإلكتروني"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "تسجيل الدخول",
+      "description": "أدخل بيانات الاعتماد الخاصة بك للوصول إلى حسابك",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل بريدك الإلكتروني",
+      "emailRequired": "البريد الإلكتروني مطلوب",
+      "emailInvalid": "يرجى إدخال عنوان بريد إلكتروني صحيح",
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "أدخل كلمة المرور الخاصة بك",
+      "passwordRequired": "كلمة المرور مطلوبة",
+      "passwordMinLength": "يجب أن تكون كلمة المرور 6 أحرف على الأقل",
+      "forgotPassword": "نسيت كلمة المرور؟",
+      "submit": "تسجيل الدخول",
+      "goToHome": "انتقل إلى الصفحة الرئيسية"
+    },
+    "resetPassword": {
+      "title": "إعادة تعيين كلمة المرور",
+      "description": "أدخل عنوان بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل بريدك الإلكتروني",
+      "emailRequired": "البريد الإلكتروني مطلوب",
+      "emailInvalid": "يرجى إدخال عنوان بريد إلكتروني صحيح",
+      "submit": "إرسال رابط إعادة التعيين",
+      "successTitle": "تحقق من بريدك الإلكتروني",
+      "successDescription": "لقد أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني",
+      "checkEmailMessage": "يرجى التحقق من بريدك الإلكتروني والنقر على الرابط لإعادة تعيين كلمة المرور. إذا لم تجده، تحقق من مجلد الرسائل غير المرغوب فيها.",
+      "backToLogin": "العودة إلى تسجيل الدخول"
+    },
+    "changePassword": {
+      "title": "تغيير كلمة المرور",
+      "description": "أدخل كلمة المرور الحالية واختر كلمة مرور جديدة",
+      "currentPassword": "كلمة المرور الحالية",
+      "currentPasswordPlaceholder": "أدخل كلمة المرور الحالية",
+      "currentPasswordRequired": "كلمة المرور الحالية مطلوبة",
+      "newPassword": "كلمة المرور الجديدة",
+      "newPasswordPlaceholder": "أدخل كلمة المرور الجديدة",
+      "newPasswordRequired": "كلمة المرور الجديدة مطلوبة",
+      "newPasswordMinLength": "يجب أن تكون كلمة المرور الجديدة 6 أحرف على الأقل",
+      "confirmPassword": "تأكيد كلمة المرور الجديدة",
+      "confirmPasswordPlaceholder": "أكد كلمة المرور الجديدة",
+      "confirmPasswordRequired": "تأكيد كلمة المرور مطلوب",
+      "passwordsDoNotMatch": "كلمات المرور غير متطابقة",
+      "submit": "تغيير كلمة المرور",
+      "successTitle": "تم تغيير كلمة المرور بنجاح",
+      "successDescription": "تم تحديث كلمة المرور الخاصة بك بنجاح",
+      "passwordChangedMessage": "تم تغيير كلمة المرور الخاصة بك. يمكنك الآن استخدام كلمة المرور الجديدة لتسجيل الدخول.",
+      "goToHome": "انتقل إلى الصفحة الرئيسية"
+    },
+    "userMenu": {
+      "changePassword": "تغيير كلمة المرور",
+      "logout": "تسجيل الخروج"
+    },
+    "errors": {
+      "failedToLogin": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+      "failedToLogout": "فشل تسجيل الخروج. يرجى المحاولة مرة أخرى.",
+      "failedToSendPasswordResetEmail": "فشل إرسال رابط إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى.",
+      "failedToChangePassword": "فشل تغيير كلمة المرور. يرجى المحاولة مرة أخرى.",
+      "unauthorizedUser": "المستخدم غير مصرح له. يرجى تسجيل الدخول مرة أخرى."
+    }
+  },
+  "booksManagement": {
+    "title": "مكتبة الكتب",
+    "description": "تصفح وإدارة الكتب.",
+    "descriptionLoggedIn": "قم بتحميل ملفاتك الخاصة أو استكشف المستندات من المستخدمين الآخرين.",
+    "descriptionNotLoggedIn": "سجل الدخول لتحميل وإدارة مستنداتك الخاصة.",
+    "upload": {
+      "title": "تحميل كتاب",
+      "description": "اختر كتاب PDF وصورة غلاف لتحميله إلى مكتبتك.",
+      "buttonText": "تحميل كتاب جديد",
+      "pdfLabel": "كتاب PDF",
+      "imageLabel": "صورة الغلاف",
+      "pdfSelected": "المحدد: {fileName}",
+      "pdfSelectedError": "يرجى اختيار كتاب PDF",
+      "pdfPlaceholder": "اختر كتاب PDF",
+      "imagePlaceholder": "اختر صورة غلاف",
+      "imageSelected": "المحدد: {fileName}",
+      "uploading": "جاري التحميل...",
+      "upload": "تحميل كتب جديدة",
+      "cancel": "إلغاء",
+      "successMessage": "تم تحميل الملف بنجاح!",
+      "errorMessage": "فشل في تحميل الملف. يرجى المحاولة مرة أخرى.",
+      "validationError": "يرجى اختيار كتاب PDF وصورة غلاف",
+      "pdfFileError": "يرجى اختيار كتاب PDF",
+      "imageFileError": "يرجى اختيار صورة غلاف"
+    },
+    "sections": {
+      "yourDocuments": "مستنداتك ({count})",
+      "communityDocuments": "الكتب ({count})"
+    },
+    "file": {
+      "download": "تحميل",
+      "view": "عرض",
+      "delete": "حذف",
+      "deleting": "جاري الحذف...",
+      "deleteConfirm": "هل أنت متأكد من أنك تريد حذف هذا الملف؟",
+      "deleteSuccess": "تم حذف الملف بنجاح!",
+      "deleteError": "فشل في حذف الملف. يرجى المحاولة مرة أخرى.",
+      "uploadedOn": "تم التحميل في {date}",
+      "downloadDescription": "يرجى النقر أدناه لتحميل الكتاب"
+    },
+    "states": {
+      "loading": "جاري تحميل الملفات...",
+      "error": "خطأ في تحميل الملفات",
+      "empty": {
+        "title": "لا توجد ملفات بعد",
+        "descriptionLoggedIn": "قم بتحميل كتابك الأول للبدء.",
+        "descriptionNotLoggedIn": "لا توجد مستندات متاحة.",
+        "uploadButton": "تحميل أول كتاب"
+      }
+    },
+    "loginCta": {
+      "title": "سجل الدخول لإدارة الملفات",
+      "description": "أنشئ حسابًا أو سجل الدخول لتحميل وإدارة كتبك الخاصة.",
+      "button": "تسجيل الدخول"
+    }
+  },
+  "localizationLanguages": {
+    "ur": "اردو",
+    "ar": "العربية",
+    "en": "English"
+  },
+  "richTextEditor": {
+    "loadingEditor": "جاري تحميل المحرر...",
+    "words": "كلمات",
+    "characters": "أحرف"
+  },
+  "booksPage": {
+    "title": "الكتب",
+    "description": "جميع كتب تحقيقات الحديث. اختر كتاباً لقراءة رواياته، أو حمّل الكتاب كاملاً من المكتبة أدناه.",
+    "seriesTitle": "غير معتبر روايات كا فني جائزه",
+    "seriesDescription": "جميع أجزاء السلسلة البحثية بالترتيب.",
+    "otherBooks": "كتب أخرى",
+    "narrations": "{count} رواية",
+    "viewNarrations": "عرض الروايات",
+    "volumeNumber": "الجزء {number}"
+  },
+  "hadithCard": {
+    "readMore": "اقرأ البحث كاملاً"
+  },
+  "aboutPage": {
+    "title": "تعريف",
+    "eyebrow": "غير معتبر روايات كا فني جائزه — المقدمة والتقاريظ",
+    "intro": "تعرض هذه الصفحة مقدمة المؤلف وتقاريظ كبار العلماء من الجزء الأول من كتاب «غير معتبر روايات كا فني جائزه»، ليطّلع القارئ على غاية هذا العمل البحثي ومنهجه وطريقته.",
+    "author": "تحقيق: {name}",
+    "coverAlt": "غلاف الجزء الأول من كتاب غير معتبر روايات كا فني جائزه",
+    "stats": {
+      "narrations": "رواية محققة",
+      "volumes": "أجزاء",
+      "books": "كتب"
+    },
+    "jumpTo": "في هذه الصفحة",
+    "taqariz": {
+      "title": "التقاريظ",
+      "description": "صور أصلية لتقاريظ كبار العلماء الواردة في الجزء الأول. انقر على صفحة لقراءتها.",
+      "page": "صفحة {number}",
+      "pages": "{count} صفحات",
+      "open": "عرض بحجم أكبر",
+      "close": "إغلاق",
+      "previous": "الصفحة السابقة",
+      "next": "الصفحة التالية",
+      "source": "المصدر: غير معتبر روايات كا فني جائزه (الجزء الأول)",
+      "items": {
+        "saleemullahKhan": {
+          "name": "الشيخ مولانا سليم الله خان رحمه الله",
+          "role": "الجامعة الفاروقية، كراتشي",
+          "date": "٥ جمادى الآخرة ١٤٣٤هـ / ١٦ أبريل ٢٠١٣م"
+        },
+        "noorUlBashar": {
+          "name": "الشيخ مولانا نور البشر محمد نور الحق",
+          "role": "أستاذ الحديث بالجامعة الفاروقية كراتشي؛ رئيس معهد عثمان بن عفان كراتشي",
+          "date": "١٧ ربيع الأول ١٤٣٤هـ / ٣٠ يناير ٢٠١٣م"
+        }
+      }
+    },
+    "muqaddima": {
+      "title": "المقدمة",
+      "description": "مقدمة المؤلف من الجزء الأول، بنص يونيكود.",
+      "contents": "المحتويات",
+      "opening": "الافتتاح",
+      "references": "المراجع",
+      "unavailable": "المقدمة غير متاحة حالياً. يرجى المحاولة بعد قليل.",
+      "backToTop": "إلى الأعلى"
+    },
+    "explore": {
+      "title": "تابع القراءة",
+      "allHadees": "جميع الأحاديث",
+      "books": "الكتب",
+      "search": "بحث الحديث"
+    }
+  }
+}

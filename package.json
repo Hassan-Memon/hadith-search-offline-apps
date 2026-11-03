@@ -1,0 +1,18 @@
+{
+  "name": "hadithsearch-apps",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline app for tehqeqatehadees.com (installable web app for Android, iOS, Windows, macOS and Linux) and its shared core.",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=26",
+    "pnpm": ">=12"
+  },
+  "scripts": {
+    "build": "pnpm --filter @tehqeqat/core build && pnpm --filter @tehqeqat/web build",
+    "test": "pnpm --filter @tehqeqat/core test",
+    "dev": "pnpm --filter @tehqeqat/core build && pnpm --filter @tehqeqat/web dev",
+    "check:contract": "node scripts/check-contract.mjs"
+  },
+  "license": "UNLICENSED"
+}

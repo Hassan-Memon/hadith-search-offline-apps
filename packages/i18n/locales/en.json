@@ -1,0 +1,440 @@
+{
+  "site": {
+    "title": "Tehqeqat-e-Hadees",
+    "description": "Tehqeqat-e-Hadees is a platform for Hadees research."
+  },
+  "navigation": {
+    "home": "Home",
+    "search-hadees": "Search Hadith",
+    "pdf-book": "PDF Book",
+    "all-hadees": "All Hadith",
+    "add-announcements": "Add Announcements",
+    "books": "Books",
+    "add-hadees": "Add Hadees",
+    "about": "About"
+  },
+  "homePage": {
+    "title": "Home Page",
+    "books": "Download Books",
+    "all-hadees": "All hadees",
+    "search-hadees": "Search hadees",
+    "all-hadees-here": "All hadees here",
+    "hero-title": "A research search engine for unreliable narrations and the sciences of hadith",
+    "books-description": "All books that you need.",
+    "all-hadees-description": "All hadees are here.",
+    "search-any-hadees-description": "Search any hadees here.",
+    "description": "A search engine for fabricated (Mawdu‘), baseless (La Asl Lahu), weak, and rejected ahadees, available for both computer and mobile devices. It also includes other research related to hadees and the sciences of hadees."
+  },
+  "addAnnouncements": {
+    "title": "Add Announcements",
+    "description": "Please add announcment. and announcment will show on home screen for users",
+    "tabs": {
+      "pop-over": "Pop Over",
+      "text-banner": "Text Banner"
+    },
+    "announcementForm": {
+      "title": "Create New Announcement",
+      "typeLabel": "Announcement Type",
+      "typePlaceholder": "Select announcement type",
+      "textType": "Text Announcement",
+      "imageType": "Image Announcement",
+      "titleLabel": "Announcement Title (Optional)",
+      "titlePlaceholder": "Enter announcement title",
+      "contentLabel": "Announcement Content",
+      "contentPlaceholder": "Enter announcement content",
+      "imageUrlLabel": "Image URL",
+      "imageUrlPlaceholder": "Enter image URL",
+      "addButton": "Add Announcement",
+      "success": "Announcement added successfully!",
+      "error": "Failed to add announcement. Please try again.",
+      "bookLabel": "Select Book",
+      "bookPlaceholder": "Choose a book for this announcement",
+      "validation": {
+        "typeRequired": "Announcement type is required",
+        "bookRequired": "Book selection is required",
+        "titleTooLong": "Title is too long (max 200 characters)",
+        "contentTooLong": "Content is too long (max 1000 characters)",
+        "imageUrlInvalid": "Please enter a valid image URL",
+        "requiredFields": "For text announcements, title or content is required. For image announcements, image URL is required."
+      },
+      "errors": {
+        "announcementAlreadyExists": "You can only create one {type} announcement at a time."
+      },
+      "noAnnouncementsFound": "No announcements found",
+      "AnnouncementsTitle": "List of Announcements"
+    }
+  },
+  "searchHadees": {
+    "title": "Search Hadees",
+    "description": "Note: Any word written for search, even if it is not present in the Arabic or Urdu text of the hadees, will still help in accessing the desired hadees if it is present in the detailed research of the hadees.",
+    "searchPlaceholder": "hadees words ...",
+    "searchButton": "Search",
+    "searchLoading": "Please wait",
+    "resultsNumber": "out of",
+    "resultsRange": "Showing {from}–{to} of {total} results",
+    "resultsFound": "results",
+    "searchEmptyError": "Write the words of the hadees for search.",
+    "searchError": "Search is temporarily unavailable. Please try again later.",
+    "bookByPlaceholder": "Select a book...",
+    "allBooks": "All Books",
+    "loadingBooks": "Loading books...",
+    "noResultsFound": "No results found",
+    "clear": "Clear",
+    "resultsCount": "{total} results",
+    "noResultsHint": "Try fewer or different words, or remove the book filter.",
+    "browseBooks": "Browse books",
+    "browseAll": "All hadith",
+    "filterBook": "Book",
+    "examples": "For example:"
+  },
+  "detailHadees": {
+    "viewModes": {
+      "birdEyeView": "Bird Eye View",
+      "defaultView": "Default View",
+      "detailedView": "Detailed View"
+    },
+    "sections": {
+      "details": "Details",
+      "references": "References",
+      "bookName": "Book Name",
+      "tags": "Topics",
+      "relatedHadith": "Related Hadees",
+      "contents": "Contents"
+    },
+    "messages": {
+      "loading": "Loading hadees...",
+      "error": "Error",
+      "notFound": "Hadees not found (ID: {id})",
+      "deleteSuccess": "Hadees deleted successfully",
+      "noContent": "No contents found",
+      "contentError": "Error: Contents not found"
+    },
+    "actions": {
+      "deleteHadith": "Delete this Hadees",
+      "deleting": "Deleting...",
+      "deleteError": "Error",
+      "deleteSuccess": "Hadees deleted successfully"
+    },
+    "breadcrumb": {
+      "home": "Home"
+    },
+    "meta": {
+      "reviewedBy": "Reviewed by {name}",
+      "updatedOn": "Last updated: {date}",
+      "reviewerName": "Mufti Tariq Amir Khan"
+    },
+    "share": {
+      "share": "Share",
+      "copyLink": "Copy link",
+      "copied": "Link copied",
+      "copyFailed": "Could not copy the link"
+    }
+  },
+  "allHadees": {
+    "title": "All Hadees",
+    "loading": "Loading...",
+    "resultsCount": "out of",
+    "hadiths": "Hadees",
+    "viewHadith": "View Hadees",
+    "noResults": "No results found",
+    "resultsNumber": "out of",
+    "resultsRange": "Showing {from}–{to} of {total} results",
+    "resultsFound": "results",
+    "description": "All researched narrations. Open any narration to read its full research.",
+    "countHeading": "{total} narrations",
+    "bookHubIntro": "All researched narrations of this book. Open any narration to read its full research."
+  },
+  "hadith": {
+    "collection": "Hadees Collection",
+    "collectionDescription": "Explore our comprehensive collection of authentic hadees with detailed research and analysis.",
+    "searchHadith": "Search Hadees",
+    "searchHadithDescription": "Search through our hadees database with advanced filters.",
+    "booksDescription": "Browse hadees collections by books and volumes.",
+    "researchDescription": "Access research papers and scholarly analysis."
+  },
+  "addHadees": {
+    "title": "Add Hadees",
+    "description": "Manage books and add hadees details.",
+    "tabs": {
+      "book": "Book",
+      "hadees": "Hadees"
+    },
+    "bookForm": {
+      "label": "Please enter the name of the new book, taking care of the spelling.",
+      "placeholder": "Write the book name here",
+      "addButton": "Add Book",
+      "error": "Failed to add book. Please try again or check if the book already exists",
+      "validation": {
+        "bookNameRequired": "Book name is required",
+        "bookNameTooLong": "Book name is too long"
+      }
+    },
+    "bookList": {
+      "title": "Books List"
+    },
+    "hadeesForm": {
+      "bookLabel": "Book",
+      "titleLabel": "Title",
+      "hukmLabel": "Ruling",
+      "detailLabel": "Detail",
+      "bookPlaceHolder": "Select a book from the list",
+      "showPreview": "Show Preview",
+      "submitButton": "Submit",
+      "submitting": "Submitting...",
+      "hidePreview": "Hide Preview",
+      "noBooks": "No books available. Please add a book first.",
+      "validation": {
+        "bookNameRequired": "Book name is required",
+        "titleRequired": "Title is required",
+        "slugRequired": "Slug is required",
+        "slugLatin": "Do not use English letters in the slug",
+        "slugTooShort": "Slug must be at least {min} characters",
+        "slugTooLong": "Slug can be at most {max} characters"
+      },
+      "authoredAtLabel": "Authored date (optional)",
+      "authoredAtHelp": "When the research was actually written. Leave empty to keep the hadith without a date — it is never guessed from the import date.",
+      "submitSuccess": "Hadees created successfully!",
+      "submitError": "Failed to create hadees. Please try again.",
+      "slugLabel": "Slug (link name)",
+      "slugPlaceholder": "e.g. حضرت جبرائیل کی چالیس ہزار سال کی عبادت",
+      "slugHelp": {
+        "what": "سلگ (لنک کا نام): یہ وہ مختصر نام ہے جو اس حدیث کے لنک (ویب ایڈریس) کے آخر میں آئے گا۔ گوگل اسی سے سمجھتا ہے کہ صفحہ کس بارے میں ہے۔",
+        "words": "حدیث کا موضوع 3 سے 8 الفاظ میں لکھیں (زیادہ سے زیادہ {max} حروف)۔ مثال: حضرت جبرائیل کی چالیس ہزار سال کی عبادت",
+        "noLabel": "شروع میں «روایت»، «حکایت» یا «حدیث» جیسے الفاظ نہ لکھیں۔",
+        "spaces": "الفاظ کے درمیان خالی جگہ چھوڑیں، وہ خود بخود «-» میں بدل جائے گی۔",
+        "noSymbols": "اعراب (زیر، زبر، پیش)، علامات (: ، ۔ \" ’) اور انگریزی حروف نہ لکھیں۔",
+        "unique": "ہر حدیث کا سلگ الگ ہونا چاہیے، اور محفوظ کرنے کے بعد اسے نہ بدلیں ورنہ پرانا لنک کام نہیں کرے گا۔"
+      }
+    }
+  },
+  "resources": {
+    "islamicBooks": "Islamic Books",
+    "islamicBooksDescription": "Access a collection of Islamic literature and references.",
+    "articlesDescription": "Read scholarly articles and research papers.",
+    "glossaryDescription": "Islamic terms and terminology explained.",
+    "faqDescription": "Frequently asked questions about hadees and Islamic studies."
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "notFound": "Not Found",
+    "goToHome": "Go to Home",
+    "search": "Search",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "view": "View",
+    "close": "Close",
+    "next": "Next",
+    "previous": "Previous",
+    "ok": "OK"
+  },
+  "language": {
+    "english": "English",
+    "urdu": "اردو",
+    "arabic": "العربية"
+  },
+  "footer": {
+    "heading": "Hadees Research",
+    "description": "A search engine for fabricated (Mawdu‘), baseless (La Asl Lahu), weak, and rejected ahadees, available for both computer and mobile devices. It also includes other research related to hadees and the sciences of hadees.",
+    "link": "Click here to share your valuable feedback.",
+    "contacts": {
+      "muftiTariqAmeerKhan": "Mufti Tariq Ameer Khan",
+      "molanaMuhammadSaleem": "Molana Muhammad Saleem",
+      "email": "Email"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Sign In",
+      "description": "Enter your credentials to access your account",
+      "email": "Email",
+      "emailPlaceholder": "Enter your email",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Please enter a valid email address",
+      "password": "Password",
+      "passwordPlaceholder": "Enter your password",
+      "passwordRequired": "Password is required",
+      "passwordMinLength": "Password must be at least 6 characters",
+      "forgotPassword": "Forgot Password?",
+      "submit": "Sign In",
+      "goToHome": "Go to Home"
+    },
+    "resetPassword": {
+      "title": "Reset Password",
+      "description": "Enter your email address and we'll send you a link to reset your password",
+      "email": "Email",
+      "emailPlaceholder": "Enter your email",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Please enter a valid email address",
+      "submit": "Send Reset Link",
+      "successTitle": "Check Your Email",
+      "successDescription": "We've sent a password reset link to your email address",
+      "checkEmailMessage": "Please check your email and click the link to reset your password. If you don't see it, check your spam folder.",
+      "backToLogin": "Back to Login"
+    },
+    "changePassword": {
+      "title": "Change Password",
+      "description": "Enter your current password and choose a new password",
+      "currentPassword": "Current Password",
+      "currentPasswordPlaceholder": "Enter your current password",
+      "currentPasswordRequired": "Current password is required",
+      "newPassword": "New Password",
+      "newPasswordPlaceholder": "Enter your new password",
+      "newPasswordRequired": "New password is required",
+      "newPasswordMinLength": "New password must be at least 6 characters",
+      "confirmPassword": "Confirm New Password",
+      "confirmPasswordPlaceholder": "Confirm your new password",
+      "confirmPasswordRequired": "Password confirmation is required",
+      "passwordsDoNotMatch": "Passwords do not match",
+      "submit": "Change Password",
+      "successTitle": "Password Changed Successfully",
+      "successDescription": "Your password has been updated successfully",
+      "passwordChangedMessage": "Your password has been changed. You can now use your new password to sign in.",
+      "goToHome": "Go to Home"
+    },
+    "userMenu": {
+      "changePassword": "Change Password",
+      "logout": "Sign Out"
+    },
+    "errors": {
+      "failedToLogin": "Failed to sign in. Please try again.",
+      "failedToLogout": "Failed to sign out. Please try again.",
+      "failedToSendPasswordResetEmail": "Failed to send password reset email. Please try again.",
+      "failedToChangePassword": "Failed to change password. Please try again.",
+      "unauthorizedUser": "Unauthorized user. Please sign in again."
+    }
+  },
+  "booksManagement": {
+    "title": "Books Library",
+    "description": "Browse and manage books.",
+    "descriptionLoggedIn": "Upload your own files or explore documents from other users.",
+    "descriptionNotLoggedIn": "Sign in to upload and manage your own documents.",
+    "upload": {
+      "title": "Upload Book",
+      "description": "Select a pdf book and a cover image to upload to your library.",
+      "buttonText": "Upload New Book",
+      "pdfLabel": "PDF book",
+      "imageLabel": "Cover Image",
+      "pdfSelected": "Selected: {fileName}",
+      "pdfSelectedError": "Please select a pdf book",
+      "pdfPlaceholder": "Select a pdf book",
+      "imagePlaceholder": "Select a cover image",
+      "imageSelected": "Selected: {fileName}",
+      "uploading": "Uploading...",
+      "upload": "Upload New Books",
+      "cancel": "Cancel",
+      "successMessage": "File uploaded successfully!",
+      "errorMessage": "Failed to upload file. Please try again.",
+      "validationError": "Please select both a pdf book and an cover image",
+      "pdfFileError": "Please select a pdf book",
+      "imageFileError": "Please select an cover image"
+    },
+    "sections": {
+      "yourDocuments": "Your Documents ({count})",
+      "communityDocuments": "Books ({count})"
+    },
+    "file": {
+      "download": "Download",
+      "view": "View",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "deleteConfirm": "Are you sure you want to delete this file?",
+      "deleteSuccess": "File deleted successfully!",
+      "deleteError": "Failed to delete file. Please try again.",
+      "uploadedOn": "Uploaded on {date}",
+      "downloadDescription": "Please click below to download the book"
+    },
+    "states": {
+      "loading": "Loading files...",
+      "error": "Error loading files",
+      "empty": {
+        "title": "No files yet",
+        "descriptionLoggedIn": "Upload your first book to get started.",
+        "descriptionNotLoggedIn": "No documents available.",
+        "uploadButton": "Upload First Book"
+      }
+    },
+    "loginCta": {
+      "title": "Sign in to manage files",
+      "description": "Create an account or sign in to upload and manage your own books.",
+      "button": "Sign In"
+    }
+  },
+  "localizationLanguages": {
+    "ur": "اردو",
+    "ar": "العربية",
+    "en": "English"
+  },
+  "richTextEditor": {
+    "loadingEditor": "Loading editor...",
+    "words": "words",
+    "characters": "characters"
+  },
+  "booksPage": {
+    "title": "Books",
+    "description": "All books of Tehqeeqat-e-Hadees. Choose a book to read its narrations, or download the complete book from the library below.",
+    "seriesTitle": "Ghair Mo'tabar Riwayat ka Fanni Jaiza",
+    "seriesDescription": "Every volume of the research series, in order.",
+    "otherBooks": "Other books",
+    "narrations": "{count} narrations",
+    "viewNarrations": "View narrations",
+    "volumeNumber": "Volume {number}"
+  },
+  "hadithCard": {
+    "readMore": "Read the full research"
+  },
+  "aboutPage": {
+    "title": "About",
+    "eyebrow": "Ghair Mo'tabar Riwayat ka Fanni Jaiza — preface and endorsements",
+    "intro": "This page presents the author's preface and the endorsements (taqariz) of senior scholars from Volume 1 of “Ghair Mo'tabar Riwayat ka Fanni Jaiza”, so a reader can see the purpose, method and approach of this research.",
+    "author": "Research: {name}",
+    "coverAlt": "Cover of Ghair Mo'tabar Riwayat ka Fanni Jaiza, Volume 1",
+    "stats": {
+      "narrations": "reviewed narrations",
+      "volumes": "volumes",
+      "books": "books"
+    },
+    "jumpTo": "On this page",
+    "taqariz": {
+      "title": "Endorsements",
+      "description": "Scans of the endorsements by senior scholars included in Volume 1. Click a page to read it.",
+      "page": "Page {number}",
+      "pages": "{count} pages",
+      "open": "View larger",
+      "close": "Close",
+      "previous": "Previous page",
+      "next": "Next page",
+      "source": "Source: Ghair Mo'tabar Riwayat ka Fanni Jaiza (Volume 1)",
+      "items": {
+        "saleemullahKhan": {
+          "name": "Maulana Saleemullah Khan (may Allah have mercy on him)",
+          "role": "Jamia Farooqia, Karachi",
+          "date": "5 Jumada al-Thani 1434 AH / 16 April 2013"
+        },
+        "noorUlBashar": {
+          "name": "Maulana Noor-ul-Bashar Muhammad Noor-ul-Haq",
+          "role": "Teacher of Hadith, Jamia Farooqia, Karachi; Principal, Ma'had Usman bin Affan, Karachi",
+          "date": "17 Rabi al-Awwal 1434 AH / 30 January 2013"
+        }
+      }
+    },
+    "muqaddima": {
+      "title": "Preface",
+      "description": "The author's preface from Volume 1, in Unicode text.",
+      "contents": "Contents",
+      "opening": "Opening",
+      "references": "References",
+      "unavailable": "The preface is not available right now. Please try again shortly.",
+      "backToTop": "Back to top"
+    },
+    "explore": {
+      "title": "Continue reading",
+      "allHadees": "All Hadith",
+      "books": "Books",
+      "search": "Search Hadith"
+    }
+  }
+}

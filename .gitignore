@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dev-dist/
+*.tsbuildinfo
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env*.local
+.DS_Store
+packages/core/src/db/schema.generated.ts
+.pnpm-store/

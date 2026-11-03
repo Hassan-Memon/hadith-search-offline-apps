@@ -1,0 +1,7 @@
+{
+  "name": "@tehqeqat/assets",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fonts (TTF, converted from frontend-next/public/fonts) and images shared by the mobile and desktop apps.",
+  "files": ["fonts", "images"]
+}

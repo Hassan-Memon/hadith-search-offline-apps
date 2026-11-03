@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
+# Install scripts pnpm may run (it blocks all by default).
+allowBuilds:
+  esbuild: true

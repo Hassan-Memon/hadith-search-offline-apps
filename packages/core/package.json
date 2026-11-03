@@ -1,0 +1,39 @@
+{
+  "name": "@tehqeqat/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared types, Urdu/Arabic search normaliser, SQLite schema, search and sync engine for the Tehqeqat offline apps.",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./node": {
+      "types": "./dist/src/adapters/node.d.ts",
+      "default": "./dist/src/adapters/node.js"
+    },
+    "./schema.sql": "./schema.sql"
+  },
+  "files": [
+    "dist",
+    "schema.sql",
+    "fixtures"
+  ],
+  "scripts": {
+    "gen": "node scripts/gen-schema.mjs",
+    "build": "node scripts/gen-schema.mjs && tsc -p tsconfig.json",
+    "test": "node scripts/gen-schema.mjs && tsc -p tsconfig.json && node --test dist/test/",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "sync-cli": "node dist/scripts/sync-cli.js"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.3"
+  }
+}

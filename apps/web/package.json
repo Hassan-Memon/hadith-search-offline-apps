@@ -1,0 +1,30 @@
+{
+  "name": "@tehqeqat/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline app for tehqeqatehadees.com: an installable web app (PWA) with the whole collection in on-device SQLite.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.50.4-build1",
+    "@tehqeqat/assets": "workspace:*",
+    "@tehqeqat/core": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router": "^7.9.0",
+    "workbox-window": "^7.4.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^7.1.0",
+    "vite-plugin-pwa": "^1.0.3"
+  }
+}

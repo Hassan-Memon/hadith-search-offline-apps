@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    env:
+      WEBSITE_REPO_TOKEN: ${{ secrets.WEBSITE_REPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - run: npm install -g pnpm@12.16.1
+      - run: pnpm install --frozen-lockfile
+      - name: Core tests (normaliser, search, sync engine)
+        run: pnpm --filter @tehqeqat/core test
+      - name: Type-check and build the app
+        run: pnpm --filter @tehqeqat/web build
+      # The schema and normaliser fixture must match the website repo's backend
+      # copy. That repo is private, so this needs a read token; without one the
+      # check is skipped (run `pnpm check:contract` locally instead).
+      - name: Contract check against the website repo
+        if: env.WEBSITE_REPO_TOKEN != ''
+        run: |
+          git clone --depth 1 --branch main "https://x-access-token:${WEBSITE_REPO_TOKEN}@github.com/Techwards/hadithsearch.git" ../hadithsearch
+          pnpm check:contract

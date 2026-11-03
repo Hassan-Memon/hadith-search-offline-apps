@@ -1,0 +1,17 @@
+{
+  "name": "@tehqeqat/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UI strings for the Tehqeqat apps (ur / en / ar). Copied from frontend-next/localization; keep them in step.",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./locales/*": "./locales/*"
+  },
+  "files": ["index.js", "index.d.ts", "locales"]
+}
