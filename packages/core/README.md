@@ -1,125 +1,108 @@
 # @tehqeqat/core
 
-Shared, platform-neutral TypeScript for the Tehqeqat offline apps (Expo mobile,
-Tauri desktop): types, the search normaliser, the SQLite schema, search queries
-and the sync engine. The Django backend implements the server side of the
-contract below; `backend/hadithsearch/hadith/sync/` mirrors `schema.sql`,
-`normalize` and `fixtures/normalize.json`.
+Shared TypeScript for the offline app: types, the Urdu/Arabic search
+normaliser, the SQLite schema, search queries, the sync engine and the data
+builder.
 
-## Sync contract (v1)
+## Where the data comes from
 
-Django serves the API at `/api/v1/sync/` on the internal compose network.
-The website exposes it publicly at **`https://tehqeqatehadees.com/api/sync/`**
-(Next.js routes that forward to Django, add open CORS and hold the snapshot
-in memory). Apps always use the public routes. Locally: `http://localhost:3000/api/sync/`.
+The website is not changed for the app. `src/build/data.ts` (run by
+`.github/workflows/deploy-pages.yml` every hour, on every push and by hand) reads
+the website's existing public API, the same requests a visitor's browser makes:
 
-### Cursor
+| Request | Used for |
+|---|---|
+| `GET /api/all-hadees/<page>` (10 per page) | the full list with `id`, `slug`, `updated_at` |
+| `GET /api/hadees-detail/<id>` | full text of new or edited hadith only |
+| `GET /api/announcements`, `GET /api/files` | banner and PDF library |
+
+It downloads the currently published build, compares `updated_at` and `slug`
+per hadith (as times: the list writes `+00:00`, the detail `Z`), fetches only
+what changed, treats missing ids as deletions, and publishes:
 
 ```
-"<updated_at_ms>|<slug>|<deleted_at_ms>"
+data/manifest.json                 cursors, counts, snapshot info, kept change files
+data/snapshot-<sha16>.sqlite.gz    whole database (first start, or device far behind)
+data/changes-<epoch>-<n>.json      { items: [full documents], deleted: [{id, slug, deleted_at}] }
+data/announcements.json, data/files.json
 ```
 
-* `updated_at_ms` – epoch milliseconds of the last applied document's `updated_at`
-* `slug` – that document's slug (tie-break: the 910 imported documents share one
-  `updated_at`, so time alone is not a cursor)
-* `deleted_at_ms` – epoch milliseconds of the newest tombstone applied (0 if none)
+Safety: it publishes nothing when the published build cannot be read, the
+list is incomplete or shrinks below half, a fetched document fails validation,
+or one run would delete more than 5 hadith (2 %) without the manual
+`allow_deletes` input. Documents whose `updated_at` moved but whose content
+did not are not sent to devices. A normal run is ~91 small list requests
+(about 15 s).
 
-The empty string means "nothing applied yet". Cursors are opaque to clients
-except for equality; the server parses them.
-
-### `GET manifest`
+## Manifest
 
 ```json
 {
   "api_version": 1,
   "schema_version": 1,
   "min_app_version": "1.0.0",
-  "generated_at": "2026-11-02T18:00:00.000Z",
-  "latest_cursor": "1761659695655|مقدمہ|0",
+  "generated_at": "2026-11-03T12:00:00.000Z",
+  "epoch": "1793700000000",
+  "latest_cursor": "1793700000000:7",
   "counts": { "hadith": 910 },
   "snapshot": {
-    "url": "/api/sync/snapshot",
-    "bytes": 7340032,
-    "sha256": "…hex…",
-    "built_at": "2026-11-02T03:00:00.000Z",
-    "cursor": "1761659695655|مقدمہ|0",
+    "url": "snapshot-de9fa15b2d3955b2.sqlite.gz",
+    "bytes": 9630545,
+    "sha256": "…",
+    "built_at": "…",
+    "cursor": "1793700000000:7",
     "schema_version": 1
-  }
+  },
+  "builds": [{ "cursor": "1793700000000:6", "file": "changes-1793700000000-6.json", "items": 1, "deleted": 0 }]
 }
 ```
 
-`snapshot` is `null` when no snapshot has been built yet. `snapshot.url` may be
-relative; clients resolve it against the manifest URL. `Cache-Control:
-public, max-age=300`.
-
-### `GET changes?since=<cursor>&limit=500`
-
-```json
-{
-  "items":   [ { "id": "…", "slug": "…", "title": "…", "book": "…", "type": "…",
-                 "hukm": "…", "html_content": "[…json…]", "raw_content": "…",
-                 "references": "…", "tags": ["…"], "authored_at": null,
-                 "created_at": "…", "updated_at": "…" } ],
-  "deleted": [ { "id": "…", "slug": "…", "deleted_at": "…" } ],
-  "next_cursor": "…",
-  "has_more": false
-}
-```
-
-* `items`: documents with `(updated_at, slug) > (since.updated_at_ms, since.slug)`,
-  sorted by `updated_at asc, slug asc` (Elasticsearch `search_after`), at most
-  `limit` (1–500, default 500). Full documents, same fields as `/api/v1/hadith`.
-* `deleted`: tombstones with `deleted_at > since.deleted_at_ms`, sorted
-  ascending, at most 1000.
-* `next_cursor`: updated part = last item (or unchanged), deleted part = newest
-  tombstone returned (or unchanged).
-* `has_more`: `items.length == limit || deleted.length == 1000`.
-* `since` missing or empty = from the beginning. Invalid cursor → 400.
-
-Applying a page is idempotent: upsert every item, delete every tombstoned id,
-then store `next_cursor`, all in one transaction.
-
-### `GET snapshot`
-
-Serves the newest `hadith-v<schema>.sqlite.gz`: a gzip of a SQLite database
-created from `schema.sql` with `hadith` and `hadith_fts` filled and
-`sync_state` row 1 set to the build cursor. Headers: `ETag` (= sha256),
-`Content-Length`, `Content-Type: application/gzip`, `Cache-Control: public,
-max-age=3600`. Supports `If-None-Match` → 304.
-
-### Tombstones
-
-Index `hadith_tombstones` `{ id: keyword, slug: keyword, deleted_at: date }`.
-Written by the delete view **before** the document is deleted. Never pruned
-(a few dozen rows a year at most).
-
-## Normaliser
-
-Both `normalize.ts` and `normalize.py` implement exactly this, in this order,
-and must pass every case in `fixtures/normalize.json`:
-
-1. Unicode NFKC (turns ﷲ into الله, ﷺ into its words, presentation forms into letters).
-2. Remove: U+0610–U+061A, U+064B–U+065F, U+0670, U+06D6–U+06DC, U+06DF–U+06E8,
-   U+06EA–U+06ED (harakat and Quranic marks), U+0640 (tatweel),
-   U+200B–U+200F (ZW space/joiners, LRM/RLM), U+FEFF.
-3. Map characters:
-   `ك→ک`, `ي→ی`, `ى→ی`, `ئ→ی`, `ؤ→و`, `أ→ا`, `إ→ا`, `آ→ا`, `ٱ→ا`,
-   `ه→ہ`, `ۀ→ہ`, `ۂ→ہ`, `ة→ہ`, `ۃ→ہ`, `ە→ہ`,
-   `٠–٩→0–9`, `۰–۹→0–9`.
-   (`ے`, `ھ`, `ں`, `گ`, `چ`, `پ`, `ژ`, `ڑ`, `ٹ`, `ڈ` are kept as they are.)
-4. Lowercase.
-5. Collapse runs of whitespace to one space and trim.
+A cursor is `<epoch>:<n>`. The epoch is set by a build from scratch (first
+run, schema change, or published data lost); a device whose epoch differs
+installs the snapshot. Within an epoch, a device at build `c` applies
+`changes-<epoch>-(c+1)` … latest; when the oldest kept file is newer than
+`c+1` (120 are kept), or the device has no data, it installs the snapshot. A
+device that needs the snapshot and cannot download it reports an error and
+retries; it never shows partial data.
+URLs in the manifest are relative to the manifest. Files are named by content
+or number, so GitHub Pages' 10-minute cache never serves a stale mix; the
+manifest itself is fetched with a cache-busting query.
 
 ## Payload size
 
-The server slims the Word HTML in the sync output only (text, `font-class-*`,
-`Arbic`, `align` and real links kept; MSO classes, `dir`/`lang`/`style`, empty
-spans and dead `file://` links dropped). `raw_content` is sent in `/changes`
-items so the device can index it, but it is **not stored** in the `hadith`
-table (the sections hold the same text); snippets are cut from the sections.
+HTML is slimmed in the published data only (`src/slim.ts`): text,
+`font-class-*`, `Arbic`, `align` and real links are kept; Word's MSO classes,
+`dir`/`lang`/`style`, empty spans and dead `file://` links are dropped.
+`raw_content` is indexed for search but not stored in the `hadith` table (the
+sections hold the same text); snippets are cut from the sections. Result: a
+9.6 MB download, about 42 MB on the device.
+
+## Normaliser
+
+`normalize.ts`, checked by `fixtures/normalize.json`:
+
+1. Unicode NFKC (ﷲ → الله, ﷺ → its words, presentation forms → letters).
+2. Remove harakat and Quranic marks (U+0610–061A, 064B–065F, 0670, 06D6–06DC,
+   06DF–06E8, 06EA–06ED), tatweel (U+0640), zero-width characters and marks
+   (U+200B–200F), BOM.
+3. Fold letters: ك→ک ي/ى/ئ→ی ؤ→و أ/إ/آ/ٱ→ا ه/ۀ/ۂ/ة/ۃ/ە→ہ, Arabic-Indic and
+   Urdu digits → 0–9.
+4. Lowercase, collapse whitespace.
+
+The full-text index (`hadith_fts`, FTS5) holds normalised text, and queries
+are normalised the same way, so «نماز», «نَمَازِ» and «نمــاز» all match.
+Ranking: exact phrase, then all words, then any word; bm25 within each.
 
 ## SQLite
 
-`schema.sql` is the single source of truth (PRAGMA `user_version` = schema
-version). `hadith_fts` holds normalised text: `title` = title_text, `body` =
-raw_content only (what the website searches), `hukm`, `book`, `tags` (space-joined).
+`schema.sql` is the single source of truth (`PRAGMA user_version` = schema
+version, embedded at build time into `src/db/schema.generated.ts`). Changing
+it: bump `user_version`, add a migration in `src/db/migrate.ts`. The next data
+build then starts over with a full build, and devices reinstall the snapshot.
+
+## Tests
+
+`pnpm test`: normaliser fixture, cursors, schema, repository, search ranking
+and highlighting, the sync engine, the static sync client, and the data
+builder end to end against a fake website (full build, unchanged run,
+edit + delete + add, a device following along, refusal on a shrunk list).

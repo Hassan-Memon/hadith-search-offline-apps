@@ -15,7 +15,11 @@
       "types": "./dist/src/adapters/node.d.ts",
       "default": "./dist/src/adapters/node.js"
     },
-    "./schema.sql": "./schema.sql"
+    "./schema.sql": "./schema.sql",
+    "./build": {
+      "types": "./dist/src/build/data.d.ts",
+      "default": "./dist/src/build/data.js"
+    }
   },
   "files": [
     "dist",
@@ -27,7 +31,7 @@
     "build": "node scripts/gen-schema.mjs && tsc -p tsconfig.json",
     "test": "node scripts/gen-schema.mjs && tsc -p tsconfig.json && node --test dist/test/",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "sync-cli": "node dist/scripts/sync-cli.js"
+    "build-data": "node dist/scripts/build-data.js"
   },
   "engines": {
     "node": ">=26"

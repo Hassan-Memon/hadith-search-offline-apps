@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router';
 
 import { Shell } from './components/Shell';
+import { BASE } from './config';
 import { AboutPage } from './pages/About';
 import { HadithPage } from './pages/Hadith';
 import { AllPage, BookPage, BooksPage } from './pages/Lists';
@@ -22,7 +23,7 @@ function FirstRun() {
   const pct = progress?.fraction !== undefined ? Math.round(progress.fraction * 100) : null;
   return (
     <div className="firstrun">
-      <img src="/icons/mark.svg" alt="" width="72" height="72" />
+      <img src={`${BASE}icons/mark.svg`} alt="" width="72" height="72" />
       <h1>{t.appName}</h1>
       <h2>{t.sync.firstTitle}</h2>
       <p>{t.sync.firstBody}</p>
@@ -58,7 +59,7 @@ export function App() {
   const { dbReady, hadithCount, fatal } = useApp();
   if (!dbReady || hadithCount === 0 || fatal) return <FirstRun />;
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={BASE.replace(/\/$/, '') || '/'}>
       <Shell>
         <Routes>
           <Route path="/" element={<HomePage />} />

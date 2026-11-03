@@ -1,6 +1,6 @@
 // Shapes shared between the Django sync API, the on-device database and the UIs.
 
-/** A hadith document exactly as `/api/v1/hadith` and `/api/v1/sync/changes` return it. */
+/** A hadith document as the website's /api/hadees-detail returns it (and changes-<n>.json carries it). */
 export interface HadithDoc {
   id: string;
   slug: string;

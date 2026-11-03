@@ -9,3 +9,4 @@ dev-dist/
 .DS_Store
 packages/core/src/db/schema.generated.ts
 .pnpm-store/
+apps/web/public/data/

@@ -10,5 +10,7 @@ export * from './sync/cursor.js';
 export * from './sync/api.js';
 export * from './sync/engine.js';
 export * from './sync/version.js';
-export { SITE_URL, SYNC_BASE_URL, SITE_API_BASE_URL, hadithWebUrl } from './site.js';
+export * from './sync/static.js';
+export * from './slim.js';
+export { SITE_URL, hadithWebUrl } from './site.js';
 export * from './richtext.js';

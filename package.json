@@ -12,7 +12,7 @@
     "build": "pnpm --filter @tehqeqat/core build && pnpm --filter @tehqeqat/web build",
     "test": "pnpm --filter @tehqeqat/core test",
     "dev": "pnpm --filter @tehqeqat/core build && pnpm --filter @tehqeqat/web dev",
-    "check:contract": "node scripts/check-contract.mjs"
+    "data:local": "pnpm --filter @tehqeqat/core build && node packages/core/dist/scripts/build-data.js --site http://localhost:3000 --out apps/web/public/data"
   },
   "license": "UNLICENSED",
   "repository": {

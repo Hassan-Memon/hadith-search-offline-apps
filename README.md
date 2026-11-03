@@ -21,30 +21,35 @@ notarisation, Windows code-signing certificates, paid build services.
 ## How it works
 
 ```
-website (tehqeqatehadees.com)                 this app (app.tehqeqatehadees.com)
-  Next.js /api/sync/manifest  ───────────────►  sync engine (packages/core)
-  Next.js /api/sync/changes   ── deltas ─────►    │
-  Next.js /api/sync/snapshot  ── 9.6 MB once ─►   ▼
-        │ forwards to                          SQLite + FTS5 in the browser
-  Django /api/v1/sync/* + Elasticsearch        (OPFS, in a Web Worker)
+tehqeqatehadees.com (unchanged)          GitHub Actions, every hour         the app (GitHub Pages)
+  /api/all-hadees/<page>   ── list ──►   build-data: compare with the  ─►  data/manifest.json
+  /api/hadees-detail/<id>  ── only  ──►  published build, fetch only        data/snapshot-….sqlite.gz
+                              changed     what changed                      data/changes-<n>.json
+                                                                              │
+                                                       phone / computer ◄────┘
+                                                       SQLite + FTS5 in the browser (OPFS, Web Worker)
 ```
 
+- **The website is not changed.** The data builder reads its public API, the
+  same requests a visitor's browser makes. A normal run is about 91 small
+  requests, once an hour; hours where nothing changed are not deployed.
+- **Safe by design:** a run that cannot read the published build, sees an
+  incomplete list, gets an invalid document or would delete more than 5
+  hadith publishes nothing and opens a "Data build failing" issue. The app
+  keeps the last good data. After an urgent correction, Actions → "Deploy app
+  and data" → Run workflow publishes it within minutes.
 - **First start** downloads one gzipped SQLite snapshot (about 10 MB), checks
   its sha256 and stores it on the device (about 42 MB).
-- **After that** the app asks `/api/sync/changes` for anything newer than its
-  cursor: on start, every 6 hours while open, when the device comes back
-  online, and when the app returns to the foreground after 30 minutes.
-  Deletions arrive as tombstones.
-- **Search** runs on the device: the same Urdu/Arabic normaliser as the server
-  (ی/ي، ک/ك، ہ/ه/ۃ، harakat), ranked phrase → all words → any word.
+- **After that** the app reads the small change files: on start, every 6 hours
+  while open, when the device comes back online, and when the app returns to
+  the foreground. Deletions arrive too.
+- **Search** runs on the device: Urdu/Arabic normaliser (ی/ي، ک/ك، ہ/ه/ۃ،
+  harakat), ranked phrase → all words → any word.
 - **The app itself** is cached by a service worker, so it opens with no
   connection. A new version installs in the background and applies on the
   next start: no store review, no reinstall.
 
-The server side (sync API, snapshot builder, public routes) lives in the
-website repository (`Techwards/hadithsearch`, PR #95). The snapshot is
-rebuilt once at the end of each website deploy; nothing extra runs on the
-droplet.
+Details: `packages/core/README.md`.
 
 ## Repository layout
 
@@ -53,13 +58,8 @@ apps/web/          the app (Vite + React + TypeScript, vite-plugin-pwa, @sqlite.
 packages/core/     shared logic: types, normaliser, SQLite schema, search, sync engine (+ tests)
 packages/assets/   fonts (from the website) and the تعارف images
 packages/i18n/     the website's ur/en/ar strings (for later languages)
-scripts/           check-contract.mjs (schema + normaliser fixture match the backend)
 ```
 
-`packages/core/README.md` is the sync contract. Its `schema.sql` and
-`fixtures/normalize.json` must stay identical to
-`backend/hadithsearch/hadith/sync/` in the website repo: `pnpm check:contract`
-compares them when that repo is checked out next to this one.
 
 ## Develop
 
@@ -67,33 +67,34 @@ Requirements: Node 26 and pnpm 12.
 
 ```bash
 pnpm install
-pnpm test                 # core: normaliser, search, sync engine
-# Website running locally on :3000 (with PR #95), Django on :8000:
-pnpm dev                  # app on http://localhost:5173, /api proxied to :3000
+pnpm test                 # core: normaliser, search, sync engine, data builder
+pnpm data:local           # build data from a local website on :3000 into apps/web/public/data
+pnpm dev                  # app on http://localhost:5173
 ```
 
-Build a production bundle pointed at a local website (for testing offline
-behaviour with `vite preview`):
+To build data from the live website instead (about 1,000 requests the first
+time, only when you really need it):
 
 ```bash
-VITE_SITE_ORIGIN=http://localhost:3000 pnpm build
-pnpm --filter @tehqeqat/web preview      # http://localhost:4173
+pnpm --filter @tehqeqat/core build
+node packages/core/dist/scripts/build-data.js --site https://tehqeqatehadees.com --out apps/web/public/data
 ```
 
 ## Hosting (free)
 
 This repository is public, so GitHub Pages and GitHub Actions are free.
 
-1. Settings → Pages → Source: **GitHub Actions**. The workflow
-   `.github/workflows/deploy-pages.yml` publishes `apps/web/dist` on every
-   push to `main`.
-2. Settings → Pages → Custom domain: `app.tehqeqatehadees.com`, then tick
-   **Enforce HTTPS** once the certificate is issued.
-3. At GoDaddy (DNS for tehqeqatehadees.com) add one record:
-   `CNAME   app   hassan-memon.github.io`
-
-The website and its server are not involved in hosting the app; the app only
-reads the website's public `/api/sync` routes.
+1. Settings → Pages → Source: **GitHub Actions**. `.github/workflows/deploy-pages.yml`
+   publishes the app and its data on every push to `main` and every 6 hours.
+2. Until the domain is ready, the app lives at
+   `https://hassan-memon.github.io/hadith-search-offline-apps/` and works there
+   (the build adapts to the address).
+3. When the website owner adds the GoDaddy record
+   `CNAME   app   hassan-memon.github.io`, set Settings → Pages → Custom domain
+   to `app.tehqeqatehadees.com` and tick **Enforce HTTPS**. Do this only after
+   the record exists: with a custom domain set, github.io redirects to it.
+   Readers who installed from the github.io address need to install once more
+   from the new address (browsers treat them as different apps).
 
 ## Release
 

@@ -1,8 +1,7 @@
--- Shared on-device schema for the Tehqeqat offline apps.
--- Owned by packages/core; backend/hadithsearch/hadith/sync/schema.sql is a
--- byte-identical copy used by the snapshot builder (CI compares the two).
--- Bump PRAGMA user_version and add a migration in packages/core/src/db/migrations.ts
--- whenever this file changes.
+-- On-device schema of the offline app. The data builder (src/build/data.ts)
+-- creates the published snapshot from it, and the app migrates with it.
+-- Bump PRAGMA user_version and add a migration in src/db/migrate.ts whenever
+-- this file changes.
 
 PRAGMA user_version = 1;
 
@@ -26,9 +25,8 @@ CREATE TABLE IF NOT EXISTS hadith (
 CREATE INDEX IF NOT EXISTS idx_hadith_book ON hadith(book);
 CREATE INDEX IF NOT EXISTS idx_hadith_updated ON hadith(updated_at, slug);
 
--- Full-text index over *normalised* text (see normalize.ts / normalize.py).
--- A plain FTS5 table (not external-content) so Python and TypeScript write
--- it the same way: delete the row by id, insert the new row.
+-- Full-text index over *normalised* text (see normalize.ts). A plain FTS5
+-- table: a row is replaced by deleting it by id and inserting it again.
 CREATE VIRTUAL TABLE IF NOT EXISTS hadith_fts USING fts5(
   id UNINDEXED,
   title,
@@ -39,8 +37,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS hadith_fts USING fts5(
   tokenize = 'unicode61 remove_diacritics 2'
 );
 
--- Announcements and the PDF library come from the website's Next API
--- (/api/announcements, /api/files) and are stored as fetched.
+-- Announcements and the PDF library, as the website lists them
+-- (published as data/announcements.json and data/files.json).
 CREATE TABLE IF NOT EXISTS announcements (
   id          TEXT PRIMARY KEY,
   kind        TEXT NOT NULL,                 -- 'text-banner' | 'pop-over'
@@ -77,7 +75,7 @@ CREATE TABLE IF NOT EXISTS settings (
 -- Exactly one row (id = 1).
 CREATE TABLE IF NOT EXISTS sync_state (
   id             INTEGER PRIMARY KEY CHECK (id = 1),
-  cursor         TEXT,                       -- "<updated_at ms>|<slug>|<deleted_at ms>"
+  cursor         TEXT,                       -- number of the last data build applied
   schema_version INTEGER NOT NULL,
   snapshot_built_at TEXT,
   last_sync_at   TEXT,
