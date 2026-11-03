@@ -82,20 +82,29 @@ pnpm --filter @tehqeqat/web preview      # http://localhost:4173
 
 ## Hosting (free)
 
-The build is static files in `apps/web/dist`. Pick one:
+This repository is public, so GitHub Pages and GitHub Actions are free.
 
-1. **GitHub Pages** (workflow `.github/workflows/deploy-pages.yml`). Free when
-   the repository is public, or when the organisation plan includes Pages for
-   private repositories. Settings → Pages → Source: GitHub Actions.
-2. **Cloudflare Pages** (free, works with private repositories). Connect the
-   repository, build command `npm i -g pnpm@12.16.1 && pnpm install && pnpm build`,
-   output directory `apps/web/dist`, environment variable `NODE_VERSION=26`.
+1. Settings → Pages → Source: **GitHub Actions**. The workflow
+   `.github/workflows/deploy-pages.yml` publishes `apps/web/dist` on every
+   push to `main`.
+2. Settings → Pages → Custom domain: `app.tehqeqatehadees.com`, then tick
+   **Enforce HTTPS** once the certificate is issued.
+3. At GoDaddy (DNS for tehqeqatehadees.com) add one record:
+   `CNAME   app   hassan-memon.github.io`
 
-Then at GoDaddy add a DNS record: `CNAME  app  →  <techwards>.github.io` (GitHub
-Pages) or the `*.pages.dev` name Cloudflare shows. Both give free HTTPS.
+The website and its server are not involved in hosting the app; the app only
+reads the website's public `/api/sync` routes.
 
 ## Release
 
 Merging to `main` deploys the app. Readers get it on their next start. Bump
 `apps/web/package.json` `version` for anything user-visible; it is shown under
 مزید → ورژن.
+
+## Copyright
+
+Copyright © Tehqeeqat-e-Hadees. All rights reserved.
+
+The code is public so it can be read and audited. No licence is granted to
+copy, modify or redistribute it, and the hadith research it displays belongs
+to its author. Only the maintainers can push to this repository.

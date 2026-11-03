@@ -14,5 +14,10 @@
     "dev": "pnpm --filter @tehqeqat/core build && pnpm --filter @tehqeqat/web dev",
     "check:contract": "node scripts/check-contract.mjs"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hassan-Memon/hadith-search-offline-apps.git"
+  },
+  "homepage": "https://app.tehqeqatehadees.com"
 }

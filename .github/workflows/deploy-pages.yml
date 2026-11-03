@@ -1,7 +1,6 @@
-# Publishes the app to GitHub Pages at https://app.tehqeqatehadees.com.
-# Free when this repository is public (or the organisation plan includes
-# Pages for private repositories). Alternative with a private repository:
-# Cloudflare Pages, see README "Hosting".
+# Publishes the app to GitHub Pages at https://app.tehqeqatehadees.com
+# (free for public repositories). The custom domain comes from
+# apps/web/public/CNAME; see README "Hosting".
 name: Deploy app
 
 on:
