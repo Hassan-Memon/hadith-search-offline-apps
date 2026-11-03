@@ -21,7 +21,7 @@ notarisation, Windows code-signing certificates, paid build services.
 ## How it works
 
 ```
-tehqeqatehadees.com (unchanged)          GitHub Actions, every 6 h          the app (GitHub Pages)
+tehqeqatehadees.com (unchanged)          GitHub Actions, every hour         the app (GitHub Pages)
   /api/all-hadees/<page>   ── list ──►   build-data: compare with the  ─►  data/manifest.json
   /api/hadees-detail/<id>  ── only  ──►  published build, fetch only        data/snapshot-….sqlite.gz
                               changed     what changed                      data/changes-<n>.json
@@ -32,7 +32,12 @@ tehqeqatehadees.com (unchanged)          GitHub Actions, every 6 h          the 
 
 - **The website is not changed.** The data builder reads its public API, the
   same requests a visitor's browser makes. A normal run is about 91 small
-  requests, four times a day.
+  requests, once an hour; hours where nothing changed are not deployed.
+- **Safe by design:** a run that cannot read the published build, sees an
+  incomplete list, gets an invalid document or would delete more than 5
+  hadith publishes nothing and opens a "Data build failing" issue. The app
+  keeps the last good data. After an urgent correction, Actions → "Deploy app
+  and data" → Run workflow publishes it within minutes.
 - **First start** downloads one gzipped SQLite snapshot (about 10 MB), checks
   its sha256 and stores it on the device (about 42 MB).
 - **After that** the app reads the small change files: on start, every 6 hours

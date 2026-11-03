@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { Link } from 'react-router';
 
-import { listFiles } from '@tehqeqat/core';
+import { getSetting, listFiles } from '@tehqeqat/core';
 
 import { Icon } from '../components/Icon';
 import { PageTitle } from '../components/Shell';
@@ -32,6 +32,7 @@ export function MorePage() {
   const [canInstall, setCanInstall] = useState(Boolean(deferred));
   const [confirmReset, setConfirmReset] = useState(false);
   const [storage, setStorage] = useState<string>('');
+  const published = useQuery(() => getSetting(db, 'data_generated_at'), []);
 
   useEffect(() => {
     const onPrompt = () => setCanInstall(true);
@@ -54,6 +55,11 @@ export function MorePage() {
         <p className="muted">
           {t.sync.last} {fmtDate(app.lastSyncAt)}
         </p>
+        {published.data && (
+          <p className="muted small">
+            {t.sync.published} {fmtDate(published.data)}
+          </p>
+        )}
         {result?.status === 'error' && (
           <p className="warn">
             {t.sync.error} {result.error}

@@ -12,6 +12,7 @@ import { searchHadith } from '../src/search.js';
 import { sync, type SnapshotInstaller } from '../src/sync/engine.js';
 import { createStaticApi, type StaticManifest } from '../src/sync/static.js';
 import { slimHtml } from '../src/slim.js';
+import { getSetting } from '../src/db/repo.js';
 
 const SITE = 'https://site.test';
 const PUB = 'https://pub.test/data/';
@@ -106,7 +107,8 @@ test('build: full, unchanged, then edit/delete/add; a device follows with snapsh
     // 1. Full build.
     const r1 = await buildData({ site: SITE, prevBase: PUB, outDir: out1, fetch: f });
     assert.equal(r1.fullBuild, true);
-    assert.equal(r1.cursor, '1');
+    assert.match(r1.cursor, /^\d+:1$/);
+    const epoch = r1.cursor.split(':')[0]!;
     assert.equal(r1.total, 23);
     const m1 = JSON.parse(await readFile(join(out1, 'manifest.json'), 'utf8')) as StaticManifest;
     assert.deepEqual(m1.builds, []);
@@ -125,7 +127,8 @@ test('build: full, unchanged, then edit/delete/add; a device follows with snapsh
     pub.dir = out1;
     site.calls.length = 0;
     const r2 = await buildData({ site: SITE, prevBase: PUB, outDir: out2, fetch: f });
-    assert.equal(r2.cursor, '1');
+    assert.equal(r2.cursor, r1.cursor);
+    assert.equal(r2.publish, false);
     assert.equal(r2.reusedSnapshot, true);
     assert.equal(r2.snapshot, r1.snapshot);
     assert.equal(site.calls.filter((u) => u.includes('/hadees-detail/')).length, 0);
@@ -153,12 +156,12 @@ test('build: full, unchanged, then edit/delete/add; a device follows with snapsh
     site.docs.splice(5, 1);
     site.docs.push({ ...makeDocs(1)[0]!, id: 'id99', slug: 'slug-99', raw_content: 'نئی روایت' });
     const r3 = await buildData({ site: SITE, prevBase: PUB, outDir: out3, fetch: f });
-    assert.equal(r3.cursor, '2');
+    assert.equal(r3.cursor, `${epoch}:2`);
     assert.equal(r3.changed, 2);
     assert.equal(r3.deleted, 1);
     assert.equal(r3.reusedSnapshot, false);
     const files3 = await readdir(out3);
-    assert.ok(files3.includes('changes-2.json'));
+    assert.ok(files3.includes(`changes-${epoch}-2.json`));
 
     // The device catches up with one change file, no snapshot.
     pub.dir = out3;
@@ -192,11 +195,12 @@ test('static api: needsSnapshot when the device is older than the kept change fi
     baseUrl: PUB,
     fetch: (async () =>
       Response.json({
-        latest_cursor: '9',
+        epoch: 'E',
+        latest_cursor: 'E:9',
         builds: [
-          { cursor: '7', file: 'changes-7.json', items: 1, deleted: 0 },
-          { cursor: '8', file: 'changes-8.json', items: 1, deleted: 0 },
-          { cursor: '9', file: 'changes-9.json', items: 1, deleted: 0 },
+          { cursor: 'E:7', file: 'changes-E-7.json', items: 1, deleted: 0 },
+          { cursor: 'E:8', file: 'changes-E-8.json', items: 1, deleted: 0 },
+          { cursor: 'E:9', file: 'changes-E-9.json', items: 1, deleted: 0 },
         ],
         snapshot: null,
         counts: { hadith: 1 },
@@ -204,7 +208,166 @@ test('static api: needsSnapshot when the device is older than the kept change fi
   });
   const manifest = await api.getManifest();
   assert.equal(api.needsSnapshot!(null, manifest), true);
-  assert.equal(api.needsSnapshot!('9', manifest), false);
-  assert.equal(api.needsSnapshot!('6', manifest), false); // needs 7, 8, 9: all kept
-  assert.equal(api.needsSnapshot!('5', manifest), true); // 6 is gone
+  assert.equal(api.needsSnapshot!('E:9', manifest), false);
+  assert.equal(api.needsSnapshot!('E:6', manifest), false); // needs 7, 8, 9: all kept
+  assert.equal(api.needsSnapshot!('E:5', manifest), true); // 6 is gone
+  assert.equal(api.needsSnapshot!('OLD:12', manifest), true); // another epoch
+  assert.equal(api.needsSnapshot!('9', manifest), true); // old cursor format
+});
+
+
+/** Run one build into a fresh directory and make it the "published" one. */
+async function publishBuild(
+  root: string,
+  name: string,
+  f: typeof fetch,
+  pub: { dir: string | null },
+  extra: Partial<Parameters<typeof buildData>[0]> = {},
+) {
+  const outDir = join(root, name);
+  const result = await buildData({ site: SITE, prevBase: PUB, outDir, fetch: f, ...extra });
+  pub.dir = outDir;
+  return result;
+}
+
+test('a timestamp-only change is not sent to devices', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tq-build-ts-'));
+  try {
+    const site = { docs: makeDocs(12), calls: [] as string[] };
+    const pub = { dir: null as string | null };
+    const f = fakeFetch(site, pub);
+    const r1 = await publishBuild(root, 'b1', f, pub);
+    site.docs[4] = { ...site.docs[4]!, updated_at: '2026-11-05T09:00:00.000000+00:00' };
+    const r2 = await publishBuild(root, 'b2', f, pub);
+    assert.equal(r2.changed, 0);
+    assert.equal(r2.timestampOnly, 1);
+    assert.equal(r2.cursor, r1.cursor); // devices have nothing to do
+    // The new timestamp is remembered: the next run fetches nothing.
+    site.calls.length = 0;
+    const r3 = await publishBuild(root, 'b3', f, pub);
+    assert.equal(r3.timestampOnly, 0);
+    assert.equal(site.calls.filter((u) => u.includes('/hadees-detail/')).length, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('refuses to publish invalid documents or many deletions at once', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tq-build-guard-'));
+  try {
+    const site = { docs: makeDocs(40), calls: [] as string[] };
+    const pub = { dir: null as string | null };
+    const f = fakeFetch(site, pub);
+    await publishBuild(root, 'b1', f, pub);
+
+    // A document without a title (e.g. the website changed its response).
+    site.docs[2] = { ...site.docs[2]!, title: '', updated_at: '2026-11-05T09:00:00.000000+00:00' };
+    await assert.rejects(buildData({ site: SITE, prevBase: PUB, outDir: join(root, 'x1'), fetch: f }), /failed validation/);
+    site.docs[2] = { ...site.docs[2]!, title: '<p>ٹھیک</p>' };
+
+    // Ten disappear in one run: more than the limit of 5.
+    site.docs.splice(10, 10);
+    await assert.rejects(buildData({ site: SITE, prevBase: PUB, outDir: join(root, 'x2'), fetch: f }), /deletions in one run/);
+    const ok = await publishBuild(root, 'b2', f, pub, { allowMassDelete: true });
+    assert.equal(ok.deleted, 10);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('an unreadable published build stops the run instead of starting over', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tq-build-5xx-'));
+  try {
+    const site = { docs: makeDocs(5), calls: [] as string[] };
+    const inner = fakeFetch(site, { dir: null });
+    const failing = (async (input: string | URL | Request) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith(PUB)) return new Response('oops', { status: 503 });
+      return inner(input);
+    }) as typeof fetch;
+    await assert.rejects(
+      buildData({ site: SITE, prevBase: PUB, outDir: join(root, 'x'), fetch: failing }),
+      /cannot read the published build/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('after a rebuild from scratch, a device with a higher old cursor reinstalls the snapshot', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tq-build-epoch-'));
+  try {
+    const site = { docs: makeDocs(15), calls: [] as string[] };
+    const pub = { dir: null as string | null };
+    const f = fakeFetch(site, pub);
+    await publishBuild(root, 'b1', f, pub);
+    // Three edits so the first epoch reaches build 4.
+    for (let i = 0; i < 3; i++) {
+      site.docs[i] = { ...site.docs[i]!, raw_content: `ترمیم ${i}`, updated_at: `2026-11-0${i + 5}T09:00:00.000000+00:00` };
+      await publishBuild(root, `e${i}`, f, pub);
+    }
+    const devicePath = join(root, 'device.sqlite');
+    const device = new NodeSqliteAdapter(devicePath);
+    const installs: string[] = [];
+    const installer: SnapshotInstaller = {
+      async install(snapshot) {
+        installs.push(snapshot.cursor);
+        const bytes = new Uint8Array(await (await f(snapshot.url)).arrayBuffer());
+        device.close();
+        await writeFile(devicePath, gunzipSync(bytes));
+        await rm(`${devicePath}-wal`, { force: true });
+        await rm(`${devicePath}-shm`, { force: true });
+        device.reopen();
+      },
+    };
+    const api = createStaticApi({ baseUrl: PUB, fetch: f });
+    await sync({ db: device, api, site: api, installer, appVersion: '1.0.0' });
+    assert.match(installs[0]!, /:4$/);
+
+    // The published data disappears; the next run rebuilds from scratch (new
+    // epoch, counter back to 1), then one more edit makes it build 2.
+    pub.dir = null;
+    await new Promise((r) => setTimeout(r, 5));
+    await publishBuild(root, 'n1', f, pub);
+    site.docs[9] = { ...site.docs[9]!, raw_content: 'نیا دور', updated_at: '2026-11-09T09:00:00.000000+00:00' };
+    const n2 = await publishBuild(root, 'n2', f, pub);
+    assert.match(n2.cursor, /:2$/);
+
+    // The device's cursor ends in 4, "higher" than 2, but from the old epoch.
+    const result = await sync({ db: device, api, site: api, installer, appVersion: '1.0.0' });
+    assert.equal(result.status, 'ok');
+    assert.equal(installs.length, 2);
+    assert.equal((await searchHadith(device, 'نیا دور')).hits[0]?.slug, 'slug-9');
+    assert.ok(await getSetting(device, 'data_generated_at'));
+    device.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('static data: a failed snapshot is an error, not a partial sync', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tq-build-fail-'));
+  try {
+    const site = { docs: makeDocs(5), calls: [] as string[] };
+    const pub = { dir: null as string | null };
+    const f = fakeFetch(site, pub);
+    await publishBuild(root, 'b1', f, pub);
+    const device = new NodeSqliteAdapter(':memory:');
+    const api = createStaticApi({ baseUrl: PUB, fetch: f });
+    const result = await sync({
+      db: device,
+      api,
+      installer: {
+        install: async () => {
+          throw new Error('network');
+        },
+      },
+      appVersion: '1.0.0',
+    });
+    assert.equal(result.status, 'error');
+    assert.equal(await countHadith(device), 0);
+    device.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

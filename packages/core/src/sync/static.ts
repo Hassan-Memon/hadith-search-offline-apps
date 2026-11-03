@@ -2,12 +2,13 @@
 //
 //   data/manifest.json          what exists, cursors, snapshot info
 //   data/snapshot-<sha>.sqlite.gz   whole database (first start, or far behind)
-//   data/changes-<n>.json       documents added/edited and ids deleted in build n
+//   data/changes-<epoch>-<n>.json   documents added/edited and ids deleted in build n
 //   data/announcements.json, data/files.json
 //
-// A cursor is a build number as a string. A device at cursor c needs the
-// change files c+1 … latest; if the oldest kept file is newer than c+1 it
-// downloads the snapshot instead.
+// A cursor is "<epoch>:<n>". The epoch changes only when the data is rebuilt
+// from scratch; then every device installs the snapshot. Within an epoch, a
+// device at build c needs the change files c+1 … latest; if the oldest kept
+// file is newer than c+1 it downloads the snapshot instead.
 import type { AnnouncementRecord, ChangesPage, FileRecord, Manifest } from '../types.js';
 import type { SiteApi, SyncApi } from './api.js';
 import { HttpError } from './api.js';
@@ -20,8 +21,17 @@ export interface BuildEntry {
 }
 
 export interface StaticManifest extends Manifest {
+  /** Id of the full build this data descends from. */
+  epoch: string;
   builds: BuildEntry[];
 }
+
+export function parseStaticCursor(cursor: string | null | undefined): { epoch: string; seq: number } {
+  const [epoch = '', seq = ''] = (cursor ?? '').split(':');
+  return { epoch, seq: Number(seq) || 0 };
+}
+
+export const formatStaticCursor = (epoch: string, seq: number) => `${epoch}:${seq}`;
 
 export interface StaticApiOptions {
   /** URL of the data directory, e.g. https://app.tehqeqatehadees.com/data/ */
@@ -29,7 +39,7 @@ export interface StaticApiOptions {
   fetch?: typeof fetch;
 }
 
-const num = (cursor: string | null | undefined) => (cursor ? Number(cursor) : 0);
+const seqOf = (cursor: string | null | undefined) => parseStaticCursor(cursor).seq;
 
 export function createStaticApi(opts: StaticApiOptions): SyncApi & SiteApi {
   const base = opts.baseUrl.endsWith('/') ? opts.baseUrl : `${opts.baseUrl}/`;
@@ -53,7 +63,7 @@ export function createStaticApi(opts: StaticApiOptions): SyncApi & SiteApi {
     },
 
     async getChanges(since): Promise<ChangesPage> {
-      const pending = builds.filter((b) => num(b.cursor) > num(since));
+      const pending = builds.filter((b) => seqOf(b.cursor) > seqOf(since));
       const next = pending[0];
       if (!next) return { items: [], deleted: [], next_cursor: since, has_more: false };
       const page = await json<{ items: ChangesPage['items']; deleted: ChangesPage['deleted'] }>(next.file);
@@ -68,10 +78,12 @@ export function createStaticApi(opts: StaticApiOptions): SyncApi & SiteApi {
     needsSnapshot(cursor, manifest) {
       if (!cursor) return true;
       if (cursor === manifest.latest_cursor) return false;
+      // Rebuilt from scratch since this device synced (or an old cursor format).
+      if (parseStaticCursor(cursor).epoch !== parseStaticCursor(manifest.latest_cursor).epoch) return true;
       const oldest = builds[0];
       // No change files kept, or the device is older than the oldest one.
       if (!oldest) return true;
-      return num(cursor) < num(oldest.cursor) - 1;
+      return seqOf(cursor) < seqOf(oldest.cursor) - 1;
     },
 
     async getAnnouncements() {

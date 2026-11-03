@@ -7,7 +7,7 @@ builder.
 ## Where the data comes from
 
 The website is not changed for the app. `src/build/data.ts` (run by
-`.github/workflows/deploy-pages.yml` every 6 hours and on every push) reads
+`.github/workflows/deploy-pages.yml` every hour, on every push and by hand) reads
 the website's existing public API, the same requests a visitor's browser makes:
 
 | Request | Used for |
@@ -23,13 +23,16 @@ what changed, treats missing ids as deletions, and publishes:
 ```
 data/manifest.json                 cursors, counts, snapshot info, kept change files
 data/snapshot-<sha16>.sqlite.gz    whole database (first start, or device far behind)
-data/changes-<n>.json              { items: [full documents], deleted: [{id, slug, deleted_at}] }
+data/changes-<epoch>-<n>.json      { items: [full documents], deleted: [{id, slug, deleted_at}] }
 data/announcements.json, data/files.json
 ```
 
-Safety: it refuses to publish when the list is incomplete or shrinks below
-half of the previous count, so a website error can never delete data on
-devices. A normal run is ~91 small list requests (about 15 s).
+Safety: it publishes nothing when the published build cannot be read, the
+list is incomplete or shrinks below half, a fetched document fails validation,
+or one run would delete more than 5 hadith (2 %) without the manual
+`allow_deletes` input. Documents whose `updated_at` moved but whose content
+did not are not sent to devices. A normal run is ~91 small list requests
+(about 15 s).
 
 ## Manifest
 
@@ -39,23 +42,28 @@ devices. A normal run is ~91 small list requests (about 15 s).
   "schema_version": 1,
   "min_app_version": "1.0.0",
   "generated_at": "2026-11-03T12:00:00.000Z",
-  "latest_cursor": "7",
+  "epoch": "1793700000000",
+  "latest_cursor": "1793700000000:7",
   "counts": { "hadith": 910 },
   "snapshot": {
     "url": "snapshot-de9fa15b2d3955b2.sqlite.gz",
     "bytes": 9630545,
     "sha256": "…",
     "built_at": "…",
-    "cursor": "7",
+    "cursor": "1793700000000:7",
     "schema_version": 1
   },
-  "builds": [{ "cursor": "6", "file": "changes-6.json", "items": 1, "deleted": 0 }]
+  "builds": [{ "cursor": "1793700000000:6", "file": "changes-1793700000000-6.json", "items": 1, "deleted": 0 }]
 }
 ```
 
-A cursor is a build number. A device at cursor `c` applies `changes-(c+1)` …
-`changes-latest`; when the oldest kept file is newer than `c+1` (120 are kept,
-about a month), or the device has no data, it installs the snapshot instead.
+A cursor is `<epoch>:<n>`. The epoch is set by a build from scratch (first
+run, schema change, or published data lost); a device whose epoch differs
+installs the snapshot. Within an epoch, a device at build `c` applies
+`changes-<epoch>-(c+1)` … latest; when the oldest kept file is newer than
+`c+1` (120 are kept), or the device has no data, it installs the snapshot. A
+device that needs the snapshot and cannot download it reports an error and
+retries; it never shows partial data.
 URLs in the manifest are relative to the manifest. Files are named by content
 or number, so GitHub Pages' 10-minute cache never serves a stale mix; the
 manifest itself is fetched with a cache-busting query.

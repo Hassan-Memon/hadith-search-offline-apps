@@ -7,20 +7,30 @@
 # data/manifest.json, the snapshot and a small change file. A normal run makes
 # about 91 small requests to the website.
 #
-# Runs on every push to main and every 6 hours.
+# Runs every hour, on every push to main, and by hand (Actions → Run
+# workflow) after an urgent correction. Hourly runs where nothing changed
+# skip the deploy.
 name: Deploy app and data
 
 on:
   push:
     branches: [main]
   schedule:
-    - cron: '17 */6 * * *'
+    # Off the top of the hour: GitHub delays top-of-hour schedules the most.
+    - cron: '17 * * * *'
   workflow_dispatch:
+    inputs:
+      allow_deletes:
+        description: 'Allow more than 5 hadith to be removed in this run (only if the website really removed them)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  issues: write
+  actions: write
 
 concurrency:
   group: pages
@@ -51,18 +61,51 @@ jobs:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}/
 
       - name: Build the data from tehqeqatehadees.com
+        id: data
         run: >
           node packages/core/dist/scripts/build-data.js
           --site https://tehqeqatehadees.com
           --prev "${{ steps.pages.outputs.base_url }}/data/"
           --out apps/web/dist/data
+          ${{ inputs.allow_deletes && '--allow-deletes' || '' }}
 
       # GitHub Pages has no SPA fallback: unknown paths get 404.html, so the
       # app shell is served there too (the service worker takes over after).
       - run: cp apps/web/dist/index.html apps/web/dist/404.html
 
-      - uses: actions/upload-pages-artifact@v3
+      # Scheduled runs deploy only when something changed; pushes and manual
+      # runs always deploy (they may carry a new app version).
+      - if: steps.data.outputs.publish == 'true' || github.event_name != 'schedule'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: apps/web/dist
-      - id: deployment
+      - if: steps.data.outputs.publish == 'true' || github.event_name != 'schedule'
+        id: deployment
         uses: actions/deploy-pages@v4
+
+      # GitHub disables scheduled workflows in repositories without activity
+      # for 60 days. Re-enabling the workflow through the API resets that
+      # clock without a commit (main is protected).
+      - name: Keep the schedule alive
+        if: success() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/deploy-pages.yml/enable" || true
+
+      # A silent failure would mean slowly staler data. Open (or update) one
+      # issue so it is noticed; the published data stays as it was.
+      - name: Report a failed run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="Data build failing"
+          NUMBER=$(gh issue list --repo "${{ github.repository }}" --state open --search "$TITLE in:title" --json number --jq '.[0].number')
+          BODY="The data build failed at $(date -u +%Y-%m-%dT%H:%MZ): $RUN_URL
+          The app keeps serving the last good data. Open the run to see why."
+          if [ -n "$NUMBER" ]; then
+            gh issue comment "$NUMBER" --repo "${{ github.repository }}" --body "$BODY"
+          else
+            gh issue create --repo "${{ github.repository }}" --title "$TITLE" --body "$BODY"
+          fi

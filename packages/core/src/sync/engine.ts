@@ -9,6 +9,7 @@ import {
   replaceAnnouncements,
   replaceFiles,
   setCursor,
+  setSetting,
   setSyncResult,
   upsertHadith,
 } from '../db/repo.js';
@@ -91,10 +92,12 @@ export async function sync(opts: SyncOptions): Promise<SyncResult> {
     let usedSnapshot = false;
     const hadithCount = await countHadith(db);
     const fresh = !state.cursor || hadithCount === 0;
+    // Some sources (static files) cannot rebuild a device from deltas at all;
+    // for them a failed snapshot is an error, never a partial "ok".
+    const deltasCannotCatchUp = (fresh && Boolean(api.needsSnapshot)) || (api.needsSnapshot?.(state.cursor, manifest) ?? false);
     const farBehind =
       !fresh &&
-      ((opts.rebootstrapThreshold ?? 2000) <= estimateBehind(manifest, hadithCount, state.cursor) ||
-        (api.needsSnapshot?.(state.cursor, manifest) ?? false));
+      ((opts.rebootstrapThreshold ?? 2000) <= estimateBehind(manifest, hadithCount, state.cursor) || deltasCannotCatchUp);
 
     if (opts.installer && manifest.snapshot && usableSnapshot(manifest.snapshot) && (fresh || farBehind || opts.forceSnapshot)) {
       try {
@@ -107,9 +110,12 @@ export async function sync(opts: SyncOptions): Promise<SyncResult> {
         state = await getSyncState(db);
         usedSnapshot = true;
       } catch (error) {
-        // Fall back to deltas from wherever we are (possibly the beginning).
+        if (deltasCannotCatchUp) throw new Error(`snapshot download failed: ${error instanceof Error ? error.message : String(error)}`);
+        // Otherwise fall back to deltas from wherever we are (possibly the beginning).
         report({ phase: 'delta', message: `snapshot failed: ${String(error)}` });
       }
+    } else if (deltasCannotCatchUp) {
+      throw new Error('no snapshot available yet');
     }
 
     let applied = 0;
@@ -154,6 +160,7 @@ export async function sync(opts: SyncOptions): Promise<SyncResult> {
     }
 
     const hadith = await countHadith(db);
+    await setSetting(db, 'data_generated_at', manifest.generated_at);
     await setSyncResult(db, 'ok');
     report({ phase: 'done', fraction: 1 });
     if (applied === 0 && deleted === 0 && !usedSnapshot) return { status: 'up-to-date', cursor, hadith };
