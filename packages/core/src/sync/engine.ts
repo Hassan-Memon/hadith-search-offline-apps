@@ -92,7 +92,9 @@ export async function sync(opts: SyncOptions): Promise<SyncResult> {
     const hadithCount = await countHadith(db);
     const fresh = !state.cursor || hadithCount === 0;
     const farBehind =
-      !fresh && (opts.rebootstrapThreshold ?? 2000) <= estimateBehind(manifest, hadithCount, state.cursor);
+      !fresh &&
+      ((opts.rebootstrapThreshold ?? 2000) <= estimateBehind(manifest, hadithCount, state.cursor) ||
+        (api.needsSnapshot?.(state.cursor, manifest) ?? false));
 
     if (opts.installer && manifest.snapshot && usableSnapshot(manifest.snapshot) && (fresh || farBehind || opts.forceSnapshot)) {
       try {

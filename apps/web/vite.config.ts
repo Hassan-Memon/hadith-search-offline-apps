@@ -7,7 +7,12 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
+// "/" for app.tehqeqatehadees.com; the deploy workflow passes "/<repo>/" while
+// the site is served from <user>.github.io/<repo>/.
+const base = process.env.BASE_PATH || '/';
+
 export default defineConfig({
+  base,
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   resolve: {
     alias: { '@assets': fileURLToPath(new URL('../../packages/assets', import.meta.url)) },
@@ -15,11 +20,7 @@ export default defineConfig({
   // sqlite-wasm loads its .wasm next to its own module; pre-bundling breaks that.
   optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
   worker: { format: 'es' },
-  server: {
-    port: 5173,
-    // Local development: the website (next start on :3000) serves /api/sync/*.
-    proxy: { '/api': 'http://localhost:3000' },
-  },
+  server: { port: 5173 },
   build: { target: 'es2022' },
   plugins: [
     react(),
@@ -27,23 +28,23 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: false,
       manifest: {
-        id: '/',
+        id: base,
         name: 'تحقیقاتِ حدیث',
         short_name: 'تحقیقاتِ حدیث',
         description: 'غیر معتبر روایات اور علومِ حدیث کا تحقیقی سرچ انجن — انٹرنیٹ کے بغیر بھی۔',
         lang: 'ur',
         dir: 'rtl',
-        start_url: '/',
-        scope: '/',
+        start_url: base,
+        scope: base,
         display: 'standalone',
         orientation: 'any',
         theme_color: '#1f2a30',
         background_color: '#f3f6f7',
         categories: ['books', 'education', 'reference'],
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
@@ -52,10 +53,11 @@ export default defineConfig({
         // reader picks it. Hadith data never goes through here: it lives in
         // SQLite and is updated by the sync engine.
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,ico,woff2,wasm}'],
-        globIgnores: ['**/Jameel_*'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        // Data files are fetched by the sync engine, never precached or rewritten.
+        globIgnores: ['**/Jameel_*', 'data/**'],
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/\/data\//],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === 'font',

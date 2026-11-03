@@ -6,14 +6,14 @@ import { useSyncExternalStore } from 'react';
 
 import {
   countHadith,
-  createHttpApi,
+  createStaticApi,
   getSyncState,
   sync,
   type SyncProgress,
   type SyncResult,
 } from '@tehqeqat/core';
 
-import { APP_VERSION, FOREGROUND_SYNC_AFTER_MS, SITE_API_BASE, SYNC_BASE, SYNC_INTERVAL_MS } from '../config';
+import { APP_VERSION, DATA_BASE, FOREGROUND_SYNC_AFTER_MS, SYNC_INTERVAL_MS } from '../config';
 import { db } from '../db/client';
 import { browserInstaller } from './installer';
 
@@ -62,7 +62,7 @@ export function useApp(): AppState {
 
 export const getApp = () => state;
 
-const api = createHttpApi({ syncBaseUrl: SYNC_BASE, siteBaseUrl: SITE_API_BASE, appVersion: APP_VERSION });
+const api = createStaticApi({ baseUrl: DATA_BASE });
 
 let running: Promise<SyncResult> | null = null;
 

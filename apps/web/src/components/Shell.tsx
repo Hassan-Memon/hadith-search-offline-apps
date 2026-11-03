@@ -7,6 +7,7 @@ import { listAnnouncements, markAnnouncementSeen, stripHtml } from '@tehqeqat/co
 import { db } from '../db/client';
 import { useQuery } from '../hooks';
 import { t } from '../strings';
+import { BASE } from '../config';
 import { useApp } from '../sync/store';
 import { Icon, type IconName } from './Icon';
 
@@ -24,7 +25,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <header className="topbar">
         <div className="topbar__inner">
           <Link to="/" className="brand" aria-label={t.appName}>
-            <img src="/icons/mark.svg" alt="" width="28" height="28" />
+            <img src={`${BASE}icons/mark.svg`} alt="" width="28" height="28" />
             <span>{t.appName}</span>
           </Link>
           <nav className="topnav" aria-label="اہم صفحات">

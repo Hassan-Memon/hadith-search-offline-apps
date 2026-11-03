@@ -3,15 +3,15 @@ import { SITE_URL } from '@tehqeqat/core';
 declare const __APP_VERSION__: string;
 export const APP_VERSION = __APP_VERSION__;
 
-// In development Vite proxies /api to the local website (see vite.config.ts),
-// so the app talks to its own origin. A build can be pointed at another
-// website (a local one for testing) with VITE_SITE_ORIGIN.
-export const SITE_ORIGIN: string = import.meta.env.DEV
-  ? location.origin
-  : (import.meta.env.VITE_SITE_ORIGIN as string | undefined) || SITE_URL;
+/** Where the app is served from: "/" on app.tehqeqatehadees.com, "/<repo>/" on github.io. */
+export const BASE = import.meta.env.BASE_URL;
 
-export const SYNC_BASE = `${SITE_ORIGIN}/api/sync`;
-export const SITE_API_BASE = `${SITE_ORIGIN}/api`;
+/**
+ * The data files (manifest, snapshot, change files) are published next to the
+ * app by the scheduled GitHub Action, so the app only ever talks to its own
+ * origin. In development they are generated into public/data (pnpm data:local).
+ */
+export const DATA_BASE = new URL(`${BASE}data/`, location.origin).href;
 
 /** The public website (for "open on the website" and shared links). */
 export const WEBSITE = SITE_URL;
