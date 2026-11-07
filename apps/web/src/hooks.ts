@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 
-import { useApp } from './sync/store';
+import { listChapters } from '@tehqeqat/core';
+
+import { db } from './db/client';
+import { getApp, useApp } from './sync/store';
 
 export interface QueryState<T> {
   data: T | undefined;
@@ -32,6 +35,23 @@ export function useQuery<T>(fn: () => Promise<T>, deps: unknown[]): QueryState<T
   }, [dbReady, dataVersion, ...deps]);
 
   return state;
+}
+
+let chapterNames: { version: number; names: Promise<Map<string, string>> } | null = null;
+
+/** Chapter slug → name, read once per data version and shared by every list. */
+export function useChapterNames(): Map<string, string> | undefined {
+  return useQuery(() => {
+    const version = getApp().dataVersion;
+    if (!chapterNames || chapterNames.version !== version) {
+      const names = listChapters(db).then((rows) => new Map(rows.map((c) => [c.slug, c.name])));
+      chapterNames = { version, names };
+      names.catch(() => {
+        chapterNames = null;
+      });
+    }
+    return chapterNames.names;
+  }, []).data;
 }
 
 /** Per-device preferences (font, size, theme). Safe when storage is blocked. */

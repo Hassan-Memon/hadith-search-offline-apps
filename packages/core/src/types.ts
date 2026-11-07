@@ -13,9 +13,19 @@ export interface HadithDoc {
   raw_content: string;
   references?: string | null;
   tags?: string[] | null;
+  /** Slug of its باب in the chapter registry. */
+  chapter?: string | null;
+  /** Narrators whose study is in this research: sections start…end (inclusive). */
+  narrators?: NarratorRef[] | null;
   authored_at?: string | null;
   created_at?: string | null;
   updated_at: string;
+}
+
+export interface NarratorRef {
+  slug: string;
+  start: number;
+  end: number;
 }
 
 export interface HadithSection {
@@ -36,6 +46,8 @@ export interface HadithRow {
   raw_content: string;
   references_html: string | null;
   tags_json: string;
+  chapter: string | null;
+  narrators_json: string;
   authored_at: string | null;
   created_at: string | null;
   updated_at: string;
@@ -49,6 +61,7 @@ export interface HadithListItem {
   title_html: string;
   title_text: string;
   hukm_html: string | null;
+  chapter: string | null;
   updated_at: string;
 }
 
@@ -69,6 +82,53 @@ export interface SearchResult {
 export interface BookCount {
   book: string;
   count: number;
+  /** From the book registry when the book is in it. */
+  volume_no?: number | null;
+  sort_order?: number | null;
+  is_series?: number | null;
+  published_at?: string | null;
+  /** 1 when every narration of the book has its pages in the book's PDF. */
+  pdf_pages?: number | null;
+}
+
+export interface ChapterCount {
+  slug: string;
+  name: string;
+  parent: string | null;
+  sort_order: number | null;
+  description: string | null;
+  count: number;
+}
+
+export interface Narrator {
+  slug: string;
+  name: string;
+  aliases: string[];
+  death_note: string | null;
+  death_year: number | null;
+  century: number | null;
+}
+
+/** The website's book, chapter and narrator registries (data/registry-<sha>.json). */
+export interface Registry {
+  books: {
+    name: string;
+    volume_no: number | null;
+    sort_order: number | null;
+    is_series: boolean;
+    published_at: string | null;
+    aliases: string[];
+    pdf_pages: boolean;
+  }[];
+  chapters: { slug: string; name: string; parent: string | null; sort_order: number | null; description: string | null }[];
+  narrators: Narrator[];
+}
+
+/** A change that does not touch the text: the hadith moved to another باب or got a date. */
+export interface MetaUpdate {
+  id: string;
+  chapter: string | null;
+  authored_at: string | null;
 }
 
 export interface TagCount {
@@ -99,11 +159,14 @@ export interface Manifest {
   latest_cursor: string;
   counts: { hadith: number };
   snapshot: SnapshotInfo | null;
+  /** The registries; a device downloads them only when sha256 changed. */
+  registry?: { url: string; sha256: string } | null;
 }
 
 export interface ChangesPage {
   items: HadithDoc[];
   deleted: Tombstone[];
+  meta?: MetaUpdate[];
   next_cursor: string;
   has_more: boolean;
 }

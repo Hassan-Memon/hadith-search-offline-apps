@@ -10,6 +10,8 @@ export const t = {
     saved: 'محفوظ',
     more: 'مزید',
     about: 'تعارف',
+    chapters: 'ابواب',
+    narrators: 'رواۃ',
   },
   search: {
     placeholder: 'حدیث، لفظ یا موضوع لکھیں…',
@@ -17,6 +19,11 @@ export const t = {
     results: (n: number) => `${fmt(n)} نتائج`,
     none: 'اس تلاش کا کوئی نتیجہ نہیں ملا۔ کوئی دوسرا لفظ آزمائیں۔',
     hint: 'تلاش آپ کے آلے پر ہوتی ہے، انٹرنیٹ کے بغیر بھی۔',
+    filterBook: 'کتاب',
+    allBooks: 'تمام کتب',
+    filterChapter: 'باب',
+    allChapters: 'تمام ابواب',
+    clearFilters: 'فلٹر ہٹائیں',
     phrase: 'پورا جملہ',
     allWords: 'تمام الفاظ',
     anyWord: 'کچھ الفاظ',
@@ -32,13 +39,76 @@ export const t = {
     series: 'غیر معتبر روایات کا فنی جائزہ',
     seriesNote: 'تحقیقی سلسلے کے تمام حصے، ترتیب وار۔',
     others: 'دیگر کتب',
+    published: (date: string) => `تاریخِ اشاعت: ${date}`,
+    intro: 'اس کتاب کی تمام تحقیق شدہ روایات۔ کسی روایت پر کلک کر کے اس کی مکمل تحقیق پڑھیں۔',
+  },
+  chapters: {
+    title: 'ابواب',
+    intro: 'موضوع کے لحاظ سے روایات: عقائد، عبادات، سیرت، فضائل اور دیگر۔',
+    other: 'دیگر',
+    chapter: (name: string) => `باب: ${name}`,
+    samples: 'ہر باب سے ایک روایت',
+    samplesMore: 'اور دکھائیں',
+    chooseBook: 'کتاب منتخب کریں',
+    allChapters: 'تمام ابواب',
+    notFound: 'یہ باب آپ کے آلے پر موجود نہیں۔',
+  },
+  narrators: {
+    title: 'رواۃِ حدیث',
+    eyebrow: 'ائمۂ جرح و تعدیل کا کلام',
+    description:
+      'ان کتب کی روایات کی اسناد میں آنے والے وہ راوی جن پر تحقیق کے دوران ائمۂ جرح و تعدیل کے اقوال نقل کیے گئے ہیں۔ کسی راوی کا نام منتخب کریں اور اس کے بارے میں ائمہ کا کلام پڑھیں۔',
+    stats: (narrators: number, studies: number, hadith: number) =>
+      `${fmt(narrators)} رواۃ · ${fmt(studies)} تراجم · ${fmt(hadith)} روایات`,
+    suggestions: 'چند رواۃ',
+    suggestionsNote: 'ہر بار نئے نام۔',
+    more: 'اور دکھائیں',
+    all: 'تمام رواۃ',
+    searchLabel: 'راوی کا نام تلاش کریں',
+    searchPlaceholder: 'نام، کنیت یا نسبت لکھیں، مثلاً: ہیثم، ابو جعفر، بصری',
+    count: (n: number) => `${fmt(n)} رواۃ`,
+    countOf: (n: number, total: number) => `${fmt(total)} میں سے ${fmt(n)} رواۃ`,
+    noMatch: 'اس نام کا کوئی راوی نہیں ملا۔ نام کا کوئی ایک حصہ لکھ کر دیکھیں۔',
+    period: 'زمانہ',
+    periodAll: 'سب',
+    century: (n: number) => `${CENTURIES[n] ?? fmt(n)} صدی ہجری`,
+    unknown: 'سنِ وفات درج نہیں',
+    empty: 'رواۃ کی فہرست ابھی آلے پر نہیں آئی۔ انٹرنیٹ سے جڑ کر تازہ کریں۔',
+    died: (note: string) => `وفات: ${note}`,
+    inNarrations: (n: number) => (n === 1 ? 'ایک روایت میں تذکرہ' : `${fmt(n)} روایات میں تذکرہ`),
+    detailEyebrow: 'راوی',
+    alsoKnown: 'دوسرے نام',
+    studiesHeading: 'ائمۂ جرح و تعدیل کا کلام',
+    intro: (name: string) =>
+      `${name} کے بارے میں ائمۂ جرح و تعدیل کے اقوال، جیسے وہ ذیل کی روایات کی تحقیق میں نقل کیے گئے ہیں۔`,
+    fromNarration: 'اس روایت کی تحقیق سے',
+    studyOf: (i: number, n: number) => `${fmt(n)} میں سے ${fmt(i)}`,
+    openNarration: 'پوری روایت اور اس کا حکم دیکھیں',
+    note: 'یہ متن کتاب کی تحقیق کا حصہ ہے اور بعینہٖ نقل کیا گیا ہے؛ روایت کا حکم جاننے کے لیے پوری تحقیق دیکھیں۔',
+    notFound: 'یہ راوی آپ کے آلے پر موجود نہیں۔',
+    inNarration: 'اس تحقیق میں مذکور رواۃ',
+    page: 'اس راوی کا الگ صفحہ',
   },
   hadith: {
     book: 'کتاب',
     hukm: 'حکم',
     details: 'تفصیل',
     references: 'حوالہ جات',
-    related: 'اسی کتاب سے',
+    related: 'متعلقہ روایات',
+    published: (date: string) => `تاریخِ اشاعت: ${date}`,
+    contents: 'فہرستِ مضامین',
+    contentsCount: (n: number) => `${fmt(n)} عنوانات`,
+    copyText: 'مکمل متن کاپی کریں',
+    textCopied: 'مکمل متن کاپی ہو گیا',
+    copyFailed: 'کاپی نہیں ہو سکا۔ متن منتخب کر کے خود کاپی کریں۔',
+    word: 'Word فائل',
+    wordReady: 'Word فائل تیار ہے',
+    wordFailed: 'Word فائل نہیں بن سکی۔ دوبارہ کوشش کریں۔',
+    print: 'پرنٹ کریں',
+    pdf: 'کتاب کے اصل صفحات (PDF)',
+    pdfOffline: 'کتاب کے صفحات کے لیے انٹرنیٹ درکار ہے۔',
+    preparing: 'تیار ہو رہا ہے …',
+    source: 'ماخذ: تحقیقاتِ حدیث',
     bookmark: 'محفوظ کریں',
     bookmarked: 'محفوظ ہے',
     share: 'شیئر کریں',
@@ -71,7 +141,9 @@ export const t = {
     retry: 'دوبارہ کوشش کریں',
     offlineFirst: 'پہلی بار ڈیٹا لینے کے لیے انٹرنیٹ درکار ہے۔ انٹرنیٹ سے جڑتے ہی ڈاؤن لوڈ خود شروع ہو جائے گا۔',
     error: 'ڈیٹا نہیں آ سکا:',
-    updateRequired: 'ایپ کا نیا ورژن درکار ہے۔ صفحہ دوبارہ کھولیں تاکہ نیا ورژن لوڈ ہو۔',
+    updateRequired: 'ایپ کا نیا ورژن درکار ہے، وہ خود بخود لوڈ ہو رہا ہے۔ نہ ہو تو ایپ بند کر کے دوبارہ کھولیں۔',
+    opening: 'کھل رہا ہے…',
+    busy: 'یہ ایپ کسی اور ونڈو یا ٹیب میں کھلی ہے۔ وہاں سے بند کر کے «دوبارہ کوشش کریں» دبائیں۔',
     badgeSyncing: 'تازہ ہو رہا ہے',
     badgeOffline: 'آف لائن',
     badgeOk: 'تازہ',
@@ -82,6 +154,11 @@ export const t = {
     never: 'ابھی نہیں',
     notPersistent:
       'یہ براؤزر ڈیٹا مستقل محفوظ نہیں کرتا، اس لیے ہر بار دوبارہ ڈاؤن لوڈ ہوگا۔ کروم، ایج یا سفاری کا نیا ورژن استعمال کریں۔',
+  },
+  update: {
+    ready: 'ایپ کا نیا ورژن تیار ہے۔',
+    apply: 'ابھی اپ ڈیٹ کریں',
+    done: (v: string) => `ایپ نئے ورژن ${v} پر اپ ڈیٹ ہو گئی۔`,
   },
   more: {
     title: 'مزید',
@@ -133,14 +210,53 @@ export const t = {
     page: (n: number) => `صفحہ ${fmt(n)}`,
     close: 'بند کریں',
     muqaddimaMissing: 'مقدمہ ابھی آلے پر نہیں آیا۔ ڈاؤن لوڈ مکمل ہونے کے بعد یہاں دکھائی دے گا۔',
+    volume2Title: 'حصہ دوم کا مقدمہ اور بعض تعبیرات کی توضیح',
+    volume2Intro:
+      'تحقیق میں بار بار آنے والی عبارات — «بیان نہیں کر سکتے»، «مختصر نوع»، «بے اصل»، «اسرائیلی روایت»، «اکتفاء» — کا مطلب مصنف کے الفاظ میں۔',
+    volume2Preface: 'مقدمہ (حصہ دوم)',
+    volume2Short: 'توضیح تعبیرات',
+    volume2Source: (book: string, pages: string) => `ماخذ: ${book}، صفحات ${pages}`,
   },
   home: {
     recent: 'حال ہی میں پڑھی گئیں',
     explore: 'دیکھیں',
     stats: (n: number, v: number) => `${fmt(n)} تحقیق شدہ روایات · ${fmt(v)} حصے`,
+    cards: {
+      all: 'تمام تحقیق شدہ روایات، کتاب اور باب کے لحاظ سے۔',
+      books: 'سلسلے کے تمام حصے اور دیگر کتب، ترتیب وار۔',
+      chapters: 'موضوع کے لحاظ سے روایات: عقائد، عبادات، سیرت، فضائل اور دیگر۔',
+      narrators: 'اسناد کے راویوں پر ائمۂ جرح و تعدیل کے اقوال، ہر راوی کا الگ صفحہ۔',
+      about: 'مقدمہ، اکابر کی تقاریظ اور تحقیق کا طریقۂ کار۔',
+      saved: 'آپ کی محفوظ اور حال ہی میں پڑھی گئی روایات۔',
+    },
   },
   back: 'واپس',
 };
+
+const CENTURIES: Record<number, string> = {
+  1: 'پہلی',
+  2: 'دوسری',
+  3: 'تیسری',
+  4: 'چوتھی',
+  5: 'پانچویں',
+  6: 'چھٹی',
+  7: 'ساتویں',
+  8: 'آٹھویں',
+  9: 'نویں',
+  10: 'دسویں',
+};
+
+/** A calendar date («2020-03-01») the way the website writes it. */
+export function fmtDay(day: string | null | undefined): string {
+  if (!day) return '';
+  const date = new Date(`${day.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return day;
+  try {
+    return new Intl.DateTimeFormat('ur-PK', { dateStyle: 'long', timeZone: 'UTC' }).format(date);
+  } catch {
+    return day.slice(0, 10);
+  }
+}
 
 export function fmt(n: number): string {
   return new Intl.NumberFormat('ur-PK').format(n);

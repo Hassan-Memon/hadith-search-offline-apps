@@ -3,13 +3,14 @@
 //   data/manifest.json          what exists, cursors, snapshot info
 //   data/snapshot-<sha>.sqlite.gz   whole database (first start, or far behind)
 //   data/changes-<epoch>-<n>.json   documents added/edited and ids deleted in build n
+//   data/registry-<sha>.json       books, chapters and narrators (fetched when the sha changes)
 //   data/announcements.json, data/files.json
 //
 // A cursor is "<epoch>:<n>". The epoch changes only when the data is rebuilt
 // from scratch; then every device installs the snapshot. Within an epoch, a
 // device at build c needs the change files c+1 … latest; if the oldest kept
 // file is newer than c+1 it downloads the snapshot instead.
-import type { AnnouncementRecord, ChangesPage, FileRecord, Manifest } from '../types.js';
+import type { AnnouncementRecord, ChangesPage, FileRecord, Manifest, Registry } from '../types.js';
 import type { SiteApi, SyncApi } from './api.js';
 import { HttpError } from './api.js';
 
@@ -59,17 +60,27 @@ export function createStaticApi(opts: StaticApiOptions): SyncApi & SiteApi {
       const manifest = await json<StaticManifest>('manifest.json', true);
       builds = Array.isArray(manifest.builds) ? manifest.builds : [];
       if (manifest.snapshot?.url) manifest.snapshot.url = new URL(manifest.snapshot.url, base).href;
+      if (manifest.registry?.url) manifest.registry.url = new URL(manifest.registry.url, base).href;
       return manifest;
+    },
+
+    async getRegistry(url) {
+      // The name carries its sha, so the normal HTTP cache is safe.
+      const res = await f(url, { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new HttpError(res.status, url);
+      const data = (await res.json()) as Partial<Registry>;
+      return { books: data.books ?? [], chapters: data.chapters ?? [], narrators: data.narrators ?? [] };
     },
 
     async getChanges(since): Promise<ChangesPage> {
       const pending = builds.filter((b) => seqOf(b.cursor) > seqOf(since));
       const next = pending[0];
       if (!next) return { items: [], deleted: [], next_cursor: since, has_more: false };
-      const page = await json<{ items: ChangesPage['items']; deleted: ChangesPage['deleted'] }>(next.file);
+      const page = await json<Pick<ChangesPage, 'items' | 'deleted' | 'meta'>>(next.file);
       return {
         items: page.items ?? [],
         deleted: page.deleted ?? [],
+        meta: page.meta ?? [],
         next_cursor: next.cursor,
         has_more: pending.length > 1,
       };

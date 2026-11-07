@@ -12,7 +12,13 @@ export type IconName =
   | 'refresh'
   | 'chevron'
   | 'info'
-  | 'download';
+  | 'download'
+  | 'layers'
+  | 'users'
+  | 'copy'
+  | 'print'
+  | 'file'
+  | 'toc';
 
 const PATHS: Record<IconName, string> = {
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm9 16-4.3-4.3',
@@ -28,6 +34,12 @@ const PATHS: Record<IconName, string> = {
   chevron: 'M15 6l-6 6 6 6',
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 8v5m0-8h.01',
   download: 'M12 3v12m-5-5 5 5 5-5M5 21h14',
+  layers: 'M12 3 3 8l9 5 9-5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5',
+  users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M18 15a6 6 0 0 1 4 5v1',
+  copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  print: 'M7 9V3h10v6M7 18H4v-7h16v7h-3M7 14h10v7H7z',
+  file: 'M6 2h9l5 5v15H6zM14 2v6h6M9 13h7M9 17h7',
+  toc: 'M4 6h2M4 12h2M4 18h2M9 6h11M9 12h11M9 18h7',
 };
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {

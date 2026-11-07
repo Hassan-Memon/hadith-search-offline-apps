@@ -25,7 +25,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': a new version waits instead of reloading the page under the
+      // reader; src/update.ts decides when to switch.
+      registerType: 'prompt',
       injectRegister: false,
       manifest: {
         id: base,

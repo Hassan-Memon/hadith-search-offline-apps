@@ -7,7 +7,19 @@ import { gunzipSync } from 'node:zlib';
 
 import { NodeSqliteAdapter } from '../src/adapters/node.js';
 import { buildData } from '../src/build/data.js';
-import { countHadith, getHadithBySlug } from '../src/db/repo.js';
+import {
+  chapterSamples,
+  countHadith,
+  getBook,
+  getHadithBySlug,
+  hadithNarrators,
+  listBooks,
+  listChapters,
+  listHadith,
+  listNarrators,
+  narratorStudies,
+  relatedHadith,
+} from '../src/db/repo.js';
 import { searchHadith } from '../src/search.js';
 import { sync, type SnapshotInstaller } from '../src/sync/engine.js';
 import { createStaticApi, type StaticManifest } from '../src/sync/static.js';
@@ -26,6 +38,16 @@ interface FakeDoc {
   html_content: string;
   raw_content: string;
   updated_at: string;
+  chapter?: string | null;
+  authored_at?: string | null;
+  narrators?: { slug: string; name: string; start: number; end: number }[];
+}
+
+/** The website's registries (served only when given). */
+interface FakeRegistries {
+  books?: unknown[];
+  chapters?: unknown[];
+  narrators?: { slug: string; name: string; [field: string]: unknown }[];
 }
 
 function makeDocs(n: number): FakeDoc[] {
@@ -41,7 +63,10 @@ function makeDocs(n: number): FakeDoc[] {
 }
 
 /** Fake website + fake published directory, served through one fetch. */
-function fakeFetch(site: { docs: FakeDoc[]; calls: string[] }, pub: { dir: string | null }): typeof fetch {
+function fakeFetch(
+  site: { docs: FakeDoc[]; calls: string[]; registries?: FakeRegistries },
+  pub: { dir: string | null },
+): typeof fetch {
   return (async (input: string | URL | Request) => {
     const url = String(input instanceof Request ? input.url : input);
     site.calls.push(url);
@@ -50,14 +75,27 @@ function fakeFetch(site: { docs: FakeDoc[]; calls: string[] }, pub: { dir: strin
       const list = /^\/api\/all-hadees\/(\d+)$/.exec(path);
       if (list) {
         const page = Number(list[1]);
-        const data = site.docs.slice((page - 1) * 10, page * 10).map(({ id, slug, title, book, updated_at }) => ({
-          id,
-          slug,
-          title,
-          book,
-          updated_at,
-        }));
+        const data = site.docs
+          .slice((page - 1) * 10, page * 10)
+          .map(({ id, slug, title, book, updated_at, chapter, authored_at }) => ({
+            id,
+            slug,
+            title,
+            book,
+            updated_at,
+            ...(chapter !== undefined ? { chapter } : {}),
+            ...(authored_at !== undefined ? { authored_at } : {}),
+          }));
         return Response.json({ total_records: site.docs.length, data });
+      }
+      const reg = site.registries;
+      if (reg?.books && path === '/api/books') return Response.json({ books: reg.books });
+      if (reg?.chapters && path === '/api/chapters') return Response.json({ chapters: reg.chapters });
+      if (reg?.narrators && path === '/api/narrators') return Response.json({ narrators: reg.narrators });
+      const narrator = /^\/api\/narrators\/(.+)$/.exec(path);
+      if (reg?.narrators && narrator) {
+        const ids = site.docs.filter((d) => d.narrators?.some((n) => n.slug === narrator[1])).map((d) => d.id);
+        return Response.json({ slug: narrator[1], hadith_ids: ids });
       }
       const detail = /^\/api\/hadees-detail\/(.+)$/.exec(path);
       if (detail) {
@@ -147,7 +185,7 @@ test('build: full, unchanged, then edit/delete/add; a device follows with snapsh
     };
     pub.dir = out2;
     const api = createStaticApi({ baseUrl: PUB, fetch: f });
-    const s1 = await sync({ db: device, api, site: api, installer, appVersion: '1.0.0' });
+    const s1 = await sync({ db: device, api, site: api, installer, appVersion: '1.2.0' });
     assert.equal(s1.status, 'ok');
     assert.equal(await countHadith(device), 23);
 
@@ -165,7 +203,7 @@ test('build: full, unchanged, then edit/delete/add; a device follows with snapsh
 
     // The device catches up with one change file, no snapshot.
     pub.dir = out3;
-    const s2 = await sync({ db: device, api, site: api, installer, appVersion: '1.0.0' });
+    const s2 = await sync({ db: device, api, site: api, installer, appVersion: '1.2.0' });
     assert.equal(s2.status, 'ok');
     if (s2.status === 'ok') {
       assert.equal(s2.usedSnapshot, false);
@@ -321,7 +359,7 @@ test('after a rebuild from scratch, a device with a higher old cursor reinstalls
       },
     };
     const api = createStaticApi({ baseUrl: PUB, fetch: f });
-    await sync({ db: device, api, site: api, installer, appVersion: '1.0.0' });
+    await sync({ db: device, api, site: api, installer, appVersion: '1.2.0' });
     assert.match(installs[0]!, /:4$/);
 
     // The published data disappears; the next run rebuilds from scratch (new
@@ -334,7 +372,7 @@ test('after a rebuild from scratch, a device with a higher old cursor reinstalls
     assert.match(n2.cursor, /:2$/);
 
     // The device's cursor ends in 4, "higher" than 2, but from the old epoch.
-    const result = await sync({ db: device, api, site: api, installer, appVersion: '1.0.0' });
+    const result = await sync({ db: device, api, site: api, installer, appVersion: '1.2.0' });
     assert.equal(result.status, 'ok');
     assert.equal(installs.length, 2);
     assert.equal((await searchHadith(device, 'نیا دور')).hits[0]?.slug, 'slug-9');
@@ -362,7 +400,7 @@ test('static data: a failed snapshot is an error, not a partial sync', async () 
           throw new Error('network');
         },
       },
-      appVersion: '1.0.0',
+      appVersion: '1.2.0',
     });
     assert.equal(result.status, 'error');
     assert.equal(await countHadith(device), 0);
@@ -399,6 +437,173 @@ test('a hadith that briefly answers 404 is retried; one that keeps failing stops
       buildData({ site: SITE, prevBase: undefined, outDir: join(root, 'b2'), fetch: flaky, retryDelayMs: 1 }),
       /HTTP 404 .*id4/,
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('chapters, the book registry and narrators reach devices; a باب move needs no detail request', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tq-registry-'));
+  try {
+    const OLD_SPELLING = 'کتاب  اول (پرانا)';
+    const docs: FakeDoc[] = makeDocs(12).map((d, i) => ({
+      ...d,
+      // Two spellings of one book, as on the website.
+      book: i < 6 ? 'کتاب اول' : OLD_SPELLING,
+      chapter: i % 3 === 0 ? 'نماز' : 'روزہ',
+      authored_at: '2020-03-01T00:00:00',
+      html_content: JSON.stringify([
+        { heading: '<p>مصدر</p>', content: `<p>متن ${i}</p>` },
+        { heading: '<p>سند میں موجود راوی زید کے بارے میں</p>', content: `<p>زید پر کلام ${i}</p>` },
+        { heading: '<p>خلاصہ</p>', content: '<p>حکم</p>' },
+      ]),
+      narrators: i < 2 ? [{ slug: 'زید', name: 'زید', start: 1, end: 1 }] : [],
+    }));
+    const registries: FakeRegistries = {
+      books: [
+        {
+          name: 'کتاب اول',
+          volume_no: 1,
+          sort_order: 1,
+          is_series: true,
+          published_at: '2020-03-01',
+          aliases: [OLD_SPELLING],
+          pdf_file_id: 'p1',
+          count: 12,
+          pdf_pages_count: 12,
+        },
+      ],
+      chapters: [
+        { slug: 'نماز', name: 'نماز', parent: 'عبادات', order: 1, description: 'نماز کے ابواب' },
+        { slug: 'روزہ', name: 'روزہ', parent: 'عبادات', order: 2 },
+      ],
+      narrators: [
+        {
+          slug: 'زید',
+          name: 'زید بن فلاں',
+          death_note: 'المتوفی ۲۰۰ھ',
+          death_year: 200,
+          century: 2,
+          study_count: 2,
+          hadith_count: 2,
+          chars: 10,
+        },
+      ],
+    };
+    const site = { docs, calls: [] as string[], registries };
+    const pub = { dir: null as string | null };
+    const f = fakeFetch(site, pub);
+
+    await buildData({ site: SITE, prevBase: PUB, outDir: join(root, 'o1'), fetch: f, retryDelayMs: 1 });
+    pub.dir = join(root, 'o1');
+    const m1 = JSON.parse(await readFile(join(root, 'o1', 'manifest.json'), 'utf8')) as StaticManifest;
+    assert.ok(m1.registry?.url.startsWith('registry-'));
+
+    const devicePath = join(root, 'device.sqlite');
+    const device = new NodeSqliteAdapter(devicePath);
+    const installer: SnapshotInstaller = {
+      async install(snapshot) {
+        const bytes = new Uint8Array(await (await f(snapshot.url)).arrayBuffer());
+        device.close();
+        await writeFile(devicePath, gunzipSync(bytes));
+        device.reopen();
+      },
+    };
+    const api = createStaticApi({ baseUrl: PUB, fetch: f });
+    site.calls.length = 0;
+    assert.equal((await sync({ db: device, api, site: api, installer, appVersion: '1.2.0' })).status, 'ok');
+    // The snapshot already carried the registry: nothing more to download.
+    assert.equal(site.calls.filter((u) => u.includes('/registry-')).length, 0);
+
+    // Both spellings count as one book, in the registry's order, with its PDF pages.
+    const books = await listBooks(device);
+    assert.deepEqual(
+      books.map((b) => [b.book, b.count, b.volume_no, b.pdf_pages]),
+      [['کتاب اول', 12, 1, 1]],
+    );
+    assert.equal((await listHadith(device, { book: 'کتاب اول' })).total, 12);
+    assert.equal((await getBook(device, OLD_SPELLING))?.book, 'کتاب اول');
+    assert.equal((await searchHadith(device, 'متن', { book: 'کتاب اول', chapter: 'نماز' })).total, 4);
+
+    const chapters = await listChapters(device);
+    assert.deepEqual(
+      chapters.map((c) => [c.slug, c.count, c.parent]),
+      [
+        ['نماز', 4, 'عبادات'],
+        ['روزہ', 8, 'عبادات'],
+      ],
+    );
+    assert.equal((await getHadithBySlug(device, 'slug-0'))?.authored_at, '2020-03-01');
+
+    // Related: the same باب first (slug-3, slug-6, slug-9), then the same book.
+    const related = await relatedHadith(device, 'id0', 'کتاب اول', 5, 'نماز');
+    assert.deepEqual(
+      related.slice(0, 3).map((r) => r.slug),
+      ['slug-3', 'slug-6', 'slug-9'],
+    );
+    assert.equal(related.length, 5);
+
+    // Narrators: the studies are sections of the narrations, read on the device.
+    const studies = await narratorStudies(device, 'زید');
+    assert.deepEqual(
+      studies.map((s) => [s.hadith.slug, s.start, s.end]),
+      [
+        ['slug-0', 1, 1],
+        ['slug-1', 1, 1],
+      ],
+    );
+    const row0 = await getHadithBySlug(device, 'slug-0');
+    assert.deepEqual(await hadithNarrators(device, row0?.narrators_json), [
+      { slug: 'زید', start: 1, end: 1, name: 'زید بن فلاں' },
+    ]);
+    const narrators = await listNarrators(device);
+    assert.deepEqual(
+      narrators.map((n) => [n.name, n.study_count, n.hadith_count, n.death_year]),
+      [['زید بن فلاں', 2, 2, 200]],
+    );
+    const samples = await chapterSamples(device, 7);
+    assert.equal(samples.length, 2);
+    assert.deepEqual(samples, await chapterSamples(device, 7));
+
+    // 2. The website moves slug-1 to «نماز» (updated_at unchanged): a meta
+    //    entry, no detail request, and the device follows.
+    site.docs[1] = { ...site.docs[1]!, chapter: 'نماز' };
+    site.calls.length = 0;
+    const r2 = await buildData({ site: SITE, prevBase: PUB, outDir: join(root, 'o2'), fetch: f, retryDelayMs: 1 });
+    assert.equal(r2.meta, 1);
+    assert.equal(r2.changed, 0);
+    assert.equal(site.calls.filter((u) => u.includes('/hadees-detail/')).length, 0);
+    pub.dir = join(root, 'o2');
+    const s2 = await sync({ db: device, api, site: api, installer, appVersion: '1.2.0' });
+    assert.equal(s2.status, 'ok');
+    assert.equal((await getHadithBySlug(device, 'slug-1'))?.chapter, 'نماز');
+
+    // 3. The website finds a narrator in slug-2 without slug-2 being edited:
+    //    its index entry appears, the builder fetches slug-2 again, and the
+    //    device gets the new narrator and the pointers.
+    site.docs[2] = { ...site.docs[2]!, narrators: [{ slug: 'عمرو', name: 'عمرو', start: 1, end: 2 }] };
+    registries.narrators!.push({ slug: 'عمرو', name: 'عمرو بن فلاں', study_count: 1, hadith_count: 1, chars: 5 });
+    site.calls.length = 0;
+    const r3 = await buildData({ site: SITE, prevBase: PUB, outDir: join(root, 'o3'), fetch: f, retryDelayMs: 1 });
+    assert.deepEqual(
+      site.calls.filter((u) => u.includes('/hadees-detail/')).map((u) => decodeURIComponent(u.split('/').pop()!)),
+      ['id2'],
+    );
+    assert.equal(r3.changed, 1);
+    pub.dir = join(root, 'o3');
+    site.calls.length = 0;
+    assert.equal((await sync({ db: device, api, site: api, installer, appVersion: '1.2.0' })).status, 'ok');
+    assert.equal(site.calls.filter((u) => u.includes('/registry-')).length, 1);
+    assert.deepEqual(
+      (await narratorStudies(device, 'عمرو')).map((s) => [s.hadith.slug, s.start, s.end]),
+      [['slug-2', 1, 2]],
+    );
+
+    // 4. Nothing changed: the registry is not downloaded again.
+    site.calls.length = 0;
+    await sync({ db: device, api, site: api, installer, appVersion: '1.2.0' });
+    assert.equal(site.calls.filter((u) => u.includes('/registry-')).length, 0);
+    device.close();
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -8,7 +8,8 @@ import { db } from '../db/client';
 import { useQuery } from '../hooks';
 import { t } from '../strings';
 import { BASE } from '../config';
-import { useApp } from '../sync/store';
+import { patchApp, useApp } from '../sync/store';
+import { applyUpdate } from '../update';
 import { Icon, type IconName } from './Icon';
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
@@ -34,11 +35,14 @@ export function Shell({ children }: { children: ReactNode }) {
                 {n.label}
               </NavLink>
             ))}
+            <NavLink to="/chapters">{t.nav.chapters}</NavLink>
+            <NavLink to="/narrators">{t.nav.narrators}</NavLink>
             <NavLink to="/about">{t.nav.about}</NavLink>
           </nav>
           <SyncBadge />
         </div>
       </header>
+      <UpdateBanner />
       <Announcement />
       <main className="main">{children}</main>
       <nav className="tabbar" aria-label="اہم صفحات">
@@ -73,6 +77,31 @@ function SyncBadge() {
       <span className="badge__dot" aria-hidden="true" />
       {label}
     </Link>
+  );
+}
+
+// A new app version is waiting (it also applies by itself when the app goes
+// to the background), or the app just updated itself.
+function UpdateBanner() {
+  const { updateReady, updatedTo } = useApp();
+  if (updateReady) {
+    return (
+      <div className="announce" role="status">
+        <p>{t.update.ready}</p>
+        <button type="button" className="btn btn--primary" onClick={() => void applyUpdate()}>
+          {t.update.apply}
+        </button>
+      </div>
+    );
+  }
+  if (!updatedTo) return null;
+  return (
+    <div className="announce" role="status">
+      <p>{t.update.done(updatedTo)}</p>
+      <button type="button" className="icon-btn" aria-label="بند کریں" onClick={() => patchApp({ updatedTo: null })}>
+        <Icon name="close" />
+      </button>
+    </div>
   );
 }
 

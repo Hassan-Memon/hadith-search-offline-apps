@@ -2,7 +2,16 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { NodeSqliteAdapter } from '../src/adapters/node.js';
-import { countHadith, getSyncState, upsertHadith } from '../src/db/repo.js';
+import {
+  countHadith,
+  deleteHadith,
+  getSyncState,
+  listBookmarks,
+  listHistory,
+  recordVisit,
+  toggleBookmark,
+  upsertHadith,
+} from '../src/db/repo.js';
 import type { SyncApi } from '../src/sync/api.js';
 import { sync } from '../src/sync/engine.js';
 import { searchHadith } from '../src/search.js';
@@ -163,6 +172,38 @@ test('snapshot installer is used on a fresh device, deltas still applied after i
     assert.equal(result.applied, 2); // the two after the snapshot cursor
   }
   assert.equal(await countHadith(db), 6);
+  db.close();
+});
+
+test('bookmarks and history survive a snapshot install that replaces the file', async () => {
+  const docs = Array.from({ length: 4 }, (_, i) => mkDoc(i));
+  const server = fakeServer(docs);
+  const db = new NodeSqliteAdapter(':memory:');
+  await sync({ db, api: server.api, appVersion: '1.0.0' });
+  await toggleBookmark(db, 'id1');
+  await toggleBookmark(db, 'id3');
+  await recordVisit(db, 'id2');
+
+  const cursor = `${T0}|slug-003|0`;
+  const api: SyncApi = {
+    ...server.api,
+    getManifest: async () => ({
+      ...(await server.api.getManifest()),
+      snapshot: { url: 'http://x/s', bytes: 1, sha256: 'ab', built_at: '', cursor, schema_version: 1 },
+    }),
+  };
+  const installer = {
+    // A new file: no device tables, and id3 was removed on the website.
+    async install() {
+      await db.exec('DELETE FROM bookmarks; DELETE FROM history;');
+      await deleteHadith(db, 'id3');
+      await db.run('UPDATE sync_state SET cursor = ? WHERE id = 1', [cursor]);
+    },
+  };
+  const result = await sync({ db, api, appVersion: '1.0.0', installer, forceSnapshot: true });
+  assert.equal(result.status, 'ok');
+  assert.deepEqual((await listBookmarks(db)).map((h) => h.id), ['id1']);
+  assert.deepEqual((await listHistory(db)).map((h) => h.id), ['id2']);
   db.close();
 });
 
