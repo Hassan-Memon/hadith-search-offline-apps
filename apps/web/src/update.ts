@@ -43,8 +43,25 @@ function rememberVersion() {
   }
 }
 
+/**
+ * A new service worker asks open pages their version when it installs
+ * (public/sw-handoff.js). Answering tells it this page knows how to switch
+ * versions calmly, so it waits; a page that does not answer (1.0) gets the
+ * new version at once.
+ */
+function answerVersionQuestions() {
+  const container = navigator.serviceWorker;
+  if (!container) return;
+  container.addEventListener('message', (event: MessageEvent<{ type?: string }>) => {
+    if (event.data?.type === 'TQ_VERSION') event.ports[0]?.postMessage({ version: APP_VERSION });
+  });
+  // Messages are held until the page says it is listening.
+  container.startMessages();
+}
+
 export function startUpdates() {
   rememberVersion();
+  answerVersionQuestions();
 
   applySw = registerSW({
     immediate: true,
