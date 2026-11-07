@@ -60,6 +60,9 @@ export default defineConfig({
         globIgnores: ['**/Jameel_*', 'data/**'],
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/\/data\//],
+        // Hands over from 1.0, whose pages never tell a waiting version to
+        // take over (see public/sw-handoff.js).
+        importScripts: ['sw-handoff.js'],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === 'font',

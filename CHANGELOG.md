@@ -24,6 +24,19 @@ Brings the website's updates of 4–7 November into the app, offline.
 - Website links (/all-hadees, /search-hadees?…, /topics, /chapters,
   /narrators) open the same page in the app.
 
+**Fixed: devices on 1.0 did not update.** 1.0 pages expect each new version
+to take over by itself. Since 1.1 a new version waits for the page to tell it
+to take over, and 1.0 pages never send that message. So a browser or
+installed app that had 1.0 open kept it until every window of the app was
+closed (a reload is not enough, and phones keep the app alive in the
+background). New browsers were fine. Now a new version asks the open pages
+their version when it installs (`public/sw-handoff.js`). If one does not
+answer (1.0), the new version takes over at once and that page reloads
+itself into it. Pages of 1.1 and later answer, so they keep the calm
+"update when in the background / update now" behaviour. Tested in a
+browser: 1.0 open → deploy → reload → 1.2 within a second; 1.2 open → next
+deploy → waits with the banner.
+
 **Data (schema 2).** The hourly build reads three small registries
 (/api/books, /api/chapters, /api/narrators) besides the list. A باب or date
 change comes with the list, so it reaches devices as a small `meta` entry
