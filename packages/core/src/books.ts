@@ -1,4 +1,4 @@
-// Series/volume parsing, the same rules as frontend-next/src/components/pages/BookHubs.tsx.
+// Books of the series and the others, in the order of the website's book registry.
 import type { BookCount } from './types.js';
 
 export const SERIES_NAME = 'غیر معتبر روایات کا فنی جائزہ';
@@ -42,15 +42,26 @@ export interface BookGroups {
   others: BookCount[];
 }
 
+/**
+ * The website's book registry decides (part number, order); the name is
+ * parsed only for a book the registry does not have yet.
+ */
 export function groupBooks(books: BookCount[]): BookGroups {
   const series: SeriesVolume[] = [];
   const others: BookCount[] = [];
   for (const entry of books) {
     const parsed = parseSeriesVolume(entry.book);
-    if (parsed) series.push({ ...entry, ...parsed });
-    else others.push(entry);
+    const inRegistry = entry.sort_order != null || entry.is_series != null;
+    if (inRegistry && entry.is_series && entry.volume_no) {
+      series.push({ ...entry, volume: entry.volume_no, label: parsed?.label ?? entry.book });
+    } else if (!inRegistry && parsed) {
+      series.push({ ...entry, ...parsed });
+    } else {
+      others.push(entry);
+    }
   }
+  const order = (b: BookCount) => b.sort_order ?? Number.MAX_SAFE_INTEGER;
   series.sort((a, b) => a.volume - b.volume || b.count - a.count);
-  others.sort((a, b) => b.count - a.count);
+  others.sort((a, b) => order(a) - order(b) || b.count - a.count);
   return { series, others };
 }

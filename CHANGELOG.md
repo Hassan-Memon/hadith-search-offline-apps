@@ -1,5 +1,68 @@
 # Changelog
 
+## 2026-11-07 — 1.2.0: ابواب, رواۃ, the book registry and the website's reader tools
+
+Brings the website's updates of 4–7 November into the app, offline.
+
+- **ابواب (chapters):** /chapters grouped like the website (عقائد، عبادات …),
+  a page per باب, the باب in the narration's breadcrumb and on list cards,
+  «ہر باب سے ایک روایت» on «تمام احادیث», and related narrations from the
+  same باب first (then the same book), as on the website.
+- **رواۃ (narrators):** /narrators with name search (harakat and letter forms
+  ignored) and a period filter, and a page per narrator with the studies
+  quoted from the narrations already on the device. A narration lists its
+  narrators and links each study section to the narrator's page.
+- **Search:** filter by book and by باب, with or without words typed.
+- **Books:** order, part numbers and publication dates from the website's
+  book registry; two stored spellings of one book are one book. The
+  narration shows «تاریخِ اشاعت».
+- **Narration page:** contents list, open/close all sections, copy the
+  whole text (formatted for Word, plain for chats), a Word (.docx) file made
+  on the device, print, text size, and «کتاب کے اصل صفحات (PDF)» from the
+  website for books whose pages are all known (needs internet).
+- **تعارف:** preface of part 2 and «بعض تعبیرات کی توضیح».
+- Website links (/all-hadees, /search-hadees?…, /topics, /chapters,
+  /narrators) open the same page in the app.
+
+**Data (schema 2).** The hourly build reads three small registries
+(/api/books, /api/chapters, /api/narrators) besides the list. A باب or date
+change comes with the list, so it reaches devices as a small `meta` entry
+without fetching the narration again. Devices download the registries
+(`registry-<sha>.json`) only when they change. The first build after this
+release is a full one (new epoch); every device downloads the snapshot once.
+
+**Size and speed, measured on the real data (910 narrations).** Snapshot
+9.45 MB gz (was 9.42), 42.2 MB on the device (was 41.8). Search, lists and
+opening a narration take the same time as before; the new small columns sit
+before the text so filters never read through it. App start-up JS 109 KB gz
+(was 103); تعارف, رواۃ and the Word export load as separate chunks.
+
+## 2026-11-04 — 1.1.0: data stays on the device; calmer app updates
+
+**Fixed: data lost on refresh (seen on Android).** The on-device database
+(SQLite in OPFS, "opfs-sahpool") can be open in only one window at a time.
+When a second copy of the app was open (the installed app plus the Chrome tab
+it was installed from, two desktop windows, or a reload while the old page was
+still shutting down), the new one could not open the files and silently used
+a throw-away in-memory copy: it downloaded 10 MB again, and that copy and any
+bookmarks made in it were gone on the next refresh.
+
+- The window in front owns the database (Web Lock with steal). The other
+  window closes its copy and takes it back when it is focused again.
+- A page that is left or reloaded stops its worker at once (`pagehide`), so
+  the next page opens the files without waiting.
+- The in-memory fallback is only used where the browser has no OPFS at all.
+- Normal starts show a short "opening" screen instead of the first-run
+  "download 10 MB" screen.
+- Bookmarks, history and dismissed announcements survive a snapshot install
+  (new data epoch, schema change, or a device far behind); before, the new
+  file replaced them.
+
+**App updates.** The service worker no longer reloads the page by itself. A new
+version waits and is applied when the app goes to the background or from the
+"update now" banner; the app checks hourly and on returning to the foreground,
+updates at once when the data needs it, and says so after it updated.
+
 ## 2026-11-03 — Decision: the app's data is built outside the website
 
 The app's data is built by a scheduled GitHub Action in this repository from

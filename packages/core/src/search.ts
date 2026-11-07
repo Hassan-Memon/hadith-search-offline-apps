@@ -1,7 +1,7 @@
 // Offline search over hadith_fts, ranked the way the website ranks:
 // phrase matches, then all words, then any word; bm25 within each tier.
 import type { DbAdapter } from './db/adapter.js';
-import { LIST_COLUMNS } from './db/repo.js';
+import { bookFilter, bookSpellings, LIST_COLUMNS } from './db/repo.js';
 import { parseSections, stripHtml } from './html.js';
 import { normalizeWithMap, queryTokens } from './normalize.js';
 import type { HadithListItem, SearchHit, SearchResult } from './types.js';
@@ -10,6 +10,8 @@ export interface SearchOptions {
   page?: number;
   pageSize?: number;
   book?: string;
+  /** Slug of a باب. */
+  chapter?: string;
   tag?: string;
 }
 
@@ -36,7 +38,7 @@ const BM25 = 'bm25(hadith_fts, 5.0, 1.0, 3.0, 0.5, 0.5)';
 export async function searchHadith(
   db: DbAdapter,
   query: string,
-  { page = 1, pageSize = 10, book, tag }: SearchOptions = {},
+  { page = 1, pageSize = 10, book, chapter, tag }: SearchOptions = {},
 ): Promise<SearchResult> {
   const match = buildMatchExpressions(query);
   if (!match) return { total: 0, page, pageSize, hits: [] };
@@ -44,8 +46,13 @@ export async function searchHadith(
   const filters: string[] = [];
   const filterParams: string[] = [];
   if (book) {
-    filters.push('h.book = ?');
-    filterParams.push(book);
+    const spellings = await bookSpellings(db, book);
+    filters.push(bookFilter(spellings));
+    filterParams.push(...spellings);
+  }
+  if (chapter) {
+    filters.push('h.chapter = ?');
+    filterParams.push(chapter);
   }
   if (tag) {
     filters.push('EXISTS (SELECT 1 FROM json_each(h.tags_json) WHERE value = ?)');

@@ -3,13 +3,17 @@
 -- Bump PRAGMA user_version and add a migration in src/db/migrate.ts whenever
 -- this file changes.
 
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 
 -- One row per hadith document, fields exactly as the API returns them.
 CREATE TABLE IF NOT EXISTS hadith (
   id              TEXT PRIMARY KEY,
   slug            TEXT NOT NULL UNIQUE,
   book            TEXT NOT NULL DEFAULT '',
+  -- Small columns before the large text ones: reading them for a filter or a
+  -- list then never walks through a narration's text.
+  chapter         TEXT,                         -- slug of its باب (chapters.slug)
+  narrators_json  TEXT NOT NULL DEFAULT '[]',   -- JSON string: [{slug, start, end}] sections studying a narrator
   type            TEXT,
   title_html      TEXT NOT NULL DEFAULT '',
   title_text      TEXT NOT NULL DEFAULT '',
@@ -24,6 +28,7 @@ CREATE TABLE IF NOT EXISTS hadith (
 );
 CREATE INDEX IF NOT EXISTS idx_hadith_book ON hadith(book);
 CREATE INDEX IF NOT EXISTS idx_hadith_updated ON hadith(updated_at, slug);
+CREATE INDEX IF NOT EXISTS idx_hadith_chapter ON hadith(chapter);
 
 -- Full-text index over *normalised* text (see normalize.ts). A plain FTS5
 -- table: a row is replaced by deleting it by id and inserting it again.
@@ -35,6 +40,39 @@ CREATE VIRTUAL TABLE IF NOT EXISTS hadith_fts USING fts5(
   book,
   tags,
   tokenize = 'unicode61 remove_diacritics 2'
+);
+
+-- The website's registries (published as data/registry-<sha>.json and
+-- replaced whole on the device when it changes).
+CREATE TABLE IF NOT EXISTS books (
+  name          TEXT PRIMARY KEY,
+  volume_no     INTEGER,                     -- part of the series, or NULL
+  sort_order    INTEGER,
+  is_series     INTEGER NOT NULL DEFAULT 0,
+  published_at  TEXT,                        -- 'YYYY-MM-DD'
+  aliases_json  TEXT NOT NULL DEFAULT '[]',  -- other stored spellings of the name
+  pdf_pages     INTEGER NOT NULL DEFAULT 0   -- 1 when every narration has its pages in the book's PDF
+);
+-- Every spelling a hadith row may carry, mapped to the book's name.
+CREATE VIEW IF NOT EXISTS book_spelling AS
+  SELECT name AS spelling, name FROM books
+  UNION SELECT j.value, b.name FROM books b, json_each(b.aliases_json) j;
+
+CREATE TABLE IF NOT EXISTS chapters (
+  slug         TEXT PRIMARY KEY,
+  name         TEXT NOT NULL,
+  parent       TEXT,                         -- group heading, e.g. «عقائد»
+  sort_order   INTEGER,
+  description  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS narrators (
+  slug         TEXT PRIMARY KEY,
+  name         TEXT NOT NULL,
+  aliases_json TEXT NOT NULL DEFAULT '[]',
+  death_note   TEXT,                         -- as printed, e.g. «المتوفی ۲۹۰ھ»
+  death_year   INTEGER,
+  century      INTEGER
 );
 
 -- Announcements and the PDF library, as the website lists them

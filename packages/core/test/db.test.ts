@@ -9,6 +9,7 @@ import {
   deleteHadith,
   getHadithBySlug,
   listBooks,
+  listChapters,
   listBookmarks,
   listHadith,
   listTags,
@@ -140,5 +141,32 @@ test('bookmarks and history', async () => {
   // Deleting a hadith cascades to bookmarks/history.
   await deleteHadith(db, 'c');
   assert.equal((await listBookmarks(db)).length, 0);
+  db.close();
+});
+
+test('a version 1 database (app 1.1) upgrades to version 2 and keeps its rows', async () => {
+  const db = new NodeSqliteAdapter(':memory:');
+  // The hadith table of schema version 1, with a row and a bookmark in it.
+  await db.exec(`
+    CREATE TABLE hadith (
+      id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, book TEXT NOT NULL DEFAULT '', type TEXT,
+      title_html TEXT NOT NULL DEFAULT '', title_text TEXT NOT NULL DEFAULT '', hukm_html TEXT,
+      html_content TEXT NOT NULL DEFAULT '[]', raw_content TEXT NOT NULL DEFAULT '',
+      references_html TEXT, tags_json TEXT NOT NULL DEFAULT '[]', authored_at TEXT, created_at TEXT,
+      updated_at TEXT NOT NULL);
+    CREATE TABLE bookmarks (id TEXT PRIMARY KEY REFERENCES hadith(id) ON DELETE CASCADE, added_at TEXT NOT NULL);
+    INSERT INTO hadith (id, slug, updated_at) VALUES ('a', 'الف', '2026-01-01');
+    INSERT INTO bookmarks VALUES ('a', '2026-01-02');
+    PRAGMA user_version = 1;
+  `);
+  const r = await ensureSchema(db);
+  assert.deepEqual(r, { from: 1, to: SCHEMA_VERSION });
+  const row = await getHadithBySlug(db, 'الف');
+  assert.equal(row?.chapter, null);
+  assert.equal(row?.narrators_json, '[]');
+  assert.equal((await listBookmarks(db)).length, 1);
+  assert.deepEqual(await listChapters(db), []);
+  // Books not in the (still empty) registry are listed as stored.
+  assert.deepEqual((await listBooks(db)).map((b) => b.book), ['']);
   db.close();
 });

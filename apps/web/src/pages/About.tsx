@@ -8,6 +8,7 @@ import nb2 from '@assets/images/about/taqriz-noor-ul-bashar-2.jpg';
 import sk from '@assets/images/about/taqriz-saleemullah-khan.jpg';
 
 import { Html } from '../components/Html';
+import { Volume2Preface } from './about/Volume2Preface';
 import { Icon } from '../components/Icon';
 import { db } from '../db/client';
 import { useQuery } from '../hooks';
@@ -58,6 +59,7 @@ export function AboutPage() {
           <nav className="jump">
             <a href="#taqariz">{t.about.taqariz}</a>
             <a href="#muqaddima">{t.about.muqaddima}</a>
+            <a href="#volume2">{t.about.volume2Short}</a>
           </nav>
         </div>
       </section>
@@ -124,6 +126,12 @@ export function AboutPage() {
             </div>
           </>
         )}
+      </section>
+
+      <section id="volume2" className="section">
+        <h2>{t.about.volume2Title}</h2>
+        <p className="muted">{t.about.volume2Intro}</p>
+        <Volume2Preface />
       </section>
 
       {viewer !== null && (

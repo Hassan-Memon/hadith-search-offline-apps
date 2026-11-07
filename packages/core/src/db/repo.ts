@@ -5,16 +5,42 @@ import { stripHtml } from '../html.js';
 import type {
   AnnouncementRecord,
   BookCount,
+  ChapterCount,
   FileRecord,
   HadithDoc,
   HadithListItem,
   HadithRow,
+  MetaUpdate,
+  Narrator,
+  NarratorRef,
+  Registry,
   SyncState,
   TagCount,
 } from '../types.js';
 import type { DbAdapter } from './adapter.js';
 
-export const LIST_COLUMNS = 'id, slug, book, title_html, title_text, hukm_html, updated_at';
+export const LIST_COLUMNS = 'id, slug, book, title_html, title_text, hukm_html, chapter, updated_at';
+
+/** A book's name and its other stored spellings (from the book registry). */
+export async function bookSpellings(db: DbAdapter, name: string): Promise<string[]> {
+  const rows = await db.all<{ spelling: string }>('SELECT spelling FROM book_spelling WHERE name = ?', [name]);
+  return [...new Set([name, ...rows.map((r) => r.spelling)])];
+}
+
+/** `h.book IN (…)` for the given spellings (a plain list is far cheaper than a subquery per search). */
+export const bookFilter = (spellings: string[]) => `h.book IN (${spellings.map(() => '?').join(', ')})`;
+
+const prefixed = (alias: string) =>
+  LIST_COLUMNS.split(', ')
+    .map((c) => `${alias}.${c}`)
+    .join(', ');
+
+export function narratorRefs(refs: unknown): NarratorRef[] {
+  if (!Array.isArray(refs)) return [];
+  return refs
+    .filter((r): r is NarratorRef => Boolean(r) && typeof (r as NarratorRef).slug === 'string')
+    .map((r) => ({ slug: r.slug, start: Number(r.start) || 0, end: Number(r.end ?? r.start) || 0 }));
+}
 
 /** Convert an API document into the row + FTS row and write both. */
 export async function upsertHadith(db: DbAdapter, doc: HadithDoc): Promise<void> {
@@ -22,14 +48,15 @@ export async function upsertHadith(db: DbAdapter, doc: HadithDoc): Promise<void>
   const tags = Array.isArray(doc.tags) ? doc.tags : [];
   await db.run(
     `INSERT INTO hadith (id, slug, book, type, title_html, title_text, hukm_html, html_content,
-       raw_content, references_html, tags_json, authored_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       raw_content, references_html, tags_json, chapter, narrators_json, authored_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        slug = excluded.slug, book = excluded.book, type = excluded.type,
        title_html = excluded.title_html, title_text = excluded.title_text,
        hukm_html = excluded.hukm_html, html_content = excluded.html_content,
        raw_content = excluded.raw_content, references_html = excluded.references_html,
-       tags_json = excluded.tags_json, authored_at = excluded.authored_at,
+       tags_json = excluded.tags_json, chapter = excluded.chapter,
+       narrators_json = excluded.narrators_json, authored_at = excluded.authored_at,
        created_at = excluded.created_at, updated_at = excluded.updated_at`,
     [
       doc.id,
@@ -45,6 +72,8 @@ export async function upsertHadith(db: DbAdapter, doc: HadithDoc): Promise<void>
       '',
       doc.references ?? null,
       JSON.stringify(tags),
+      doc.chapter || null,
+      JSON.stringify(narratorRefs(doc.narrators)),
       doc.authored_at ?? null,
       doc.created_at ?? null,
       doc.updated_at,
@@ -61,6 +90,15 @@ export async function upsertHadith(db: DbAdapter, doc: HadithDoc): Promise<void>
     normalize(stripHtml(doc.hukm)),
     normalize(doc.book ?? ''),
     normalize(tags.join(' ')),
+  ]);
+}
+
+/** The website moved a hadith to another باب or dated it, without touching the text. */
+export async function updateHadithMeta(db: DbAdapter, meta: MetaUpdate): Promise<void> {
+  await db.run('UPDATE hadith SET chapter = ?, authored_at = ? WHERE id = ?', [
+    meta.chapter || null,
+    meta.authored_at ?? null,
+    meta.id,
   ]);
 }
 
@@ -86,6 +124,7 @@ export interface ListOptions {
   page?: number;
   pageSize?: number;
   book?: string;
+  chapter?: string;
   tag?: string;
   /** 'index' = stored order (rowid, like the website), 'title' = alphabetical. */
   order?: 'index' | 'title';
@@ -93,32 +132,91 @@ export interface ListOptions {
 
 export async function listHadith(
   db: DbAdapter,
-  { page = 1, pageSize = 10, book, tag, order = 'index' }: ListOptions = {},
+  { page = 1, pageSize = 10, book, chapter, tag, order = 'index' }: ListOptions = {},
 ): Promise<{ total: number; items: HadithListItem[] }> {
   const where: string[] = [];
   const params: (string | number)[] = [];
   if (book) {
-    where.push('book = ?');
-    params.push(book);
+    const spellings = await bookSpellings(db, book);
+    where.push(bookFilter(spellings));
+    params.push(...spellings);
+  }
+  if (chapter) {
+    where.push('h.chapter = ?');
+    params.push(chapter);
   }
   if (tag) {
-    where.push('EXISTS (SELECT 1 FROM json_each(hadith.tags_json) WHERE value = ?)');
+    where.push('EXISTS (SELECT 1 FROM json_each(h.tags_json) WHERE value = ?)');
     params.push(tag);
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const orderSql = order === 'title' ? 'ORDER BY title_text' : 'ORDER BY rowid';
+  const orderSql = order === 'title' ? 'ORDER BY h.title_text' : 'ORDER BY h.rowid';
   const total = Number(
-    (await db.get<{ c: number }>(`SELECT count(*) AS c FROM hadith ${whereSql}`, params))?.c ?? 0,
+    (await db.get<{ c: number }>(`SELECT count(*) AS c FROM hadith h ${whereSql}`, params))?.c ?? 0,
   );
   const items = await db.all<HadithListItem>(
-    `SELECT ${LIST_COLUMNS} FROM hadith ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
+    `SELECT ${prefixed('h')} FROM hadith h ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
     [...params, pageSize, (Math.max(1, page) - 1) * pageSize],
   );
   return { total, items };
 }
 
+/** Books with their counts in the website's order; other spellings of a book count as that book. */
 export async function listBooks(db: DbAdapter): Promise<BookCount[]> {
-  return db.all<BookCount>('SELECT book, count(*) AS count FROM hadith GROUP BY book ORDER BY count DESC');
+  return db.all<BookCount>(
+    `SELECT coalesce(s.name, h.book) AS book, count(*) AS count, b.volume_no, b.sort_order,
+       b.is_series, b.published_at, b.pdf_pages
+     FROM hadith h
+     LEFT JOIN book_spelling s ON s.spelling = h.book
+     LEFT JOIN books b ON b.name = coalesce(s.name, h.book)
+     GROUP BY coalesce(s.name, h.book)
+     ORDER BY b.sort_order IS NULL, b.sort_order, count(*) DESC`,
+  );
+}
+
+/** A book's registry entry, found by its name or another spelling. */
+export async function getBook(db: DbAdapter, spelling: string): Promise<BookCount | undefined> {
+  return db.get<BookCount>(
+    `SELECT b.name AS book, b.volume_no, b.sort_order, b.is_series, b.published_at, b.pdf_pages, 0 AS count
+     FROM book_spelling s JOIN books b ON b.name = s.name WHERE s.spelling = ?`,
+    [spelling],
+  );
+}
+
+/** Chapters in the website's order, with how many hadith each has. */
+export async function listChapters(db: DbAdapter): Promise<ChapterCount[]> {
+  return db.all<ChapterCount>(
+    `SELECT c.slug, c.name, c.parent, c.sort_order, c.description, count(h.id) AS count
+     FROM chapters c LEFT JOIN hadith h ON h.chapter = c.slug
+     GROUP BY c.slug ORDER BY c.sort_order IS NULL, c.sort_order, c.name`,
+  );
+}
+
+export async function getChapter(db: DbAdapter, slug: string): Promise<ChapterCount | undefined> {
+  return db.get<ChapterCount>(
+    `SELECT c.slug, c.name, c.parent, c.sort_order, c.description,
+       (SELECT count(*) FROM hadith h WHERE h.chapter = c.slug) AS count
+     FROM chapters c WHERE c.slug = ?`,
+    [slug],
+  );
+}
+
+/**
+ * One hadith from each chapter («ہر باب سے ایک روایت»). The same seed gives
+ * the same picks and order, so a list does not reshuffle while it is read.
+ */
+export async function chapterSamples(
+  db: DbAdapter,
+  seed: number,
+): Promise<(HadithListItem & { chapter_name: string })[]> {
+  const s = (Math.abs(Math.trunc(seed)) % 997) + 1;
+  return db.all(
+    `SELECT ${prefixed('h')}, c.name AS chapter_name
+     FROM chapters c JOIN hadith h ON h.rowid = (
+       SELECT rowid FROM hadith WHERE chapter = c.slug ORDER BY (rowid * ?) % 1009, rowid LIMIT 1)
+     ORDER BY (c.rowid * ?) % 1013, c.rowid`,
+    [s, s],
+  );
 }
 
 export async function listTags(db: DbAdapter): Promise<TagCount[]> {
@@ -128,13 +226,178 @@ export async function listTags(db: DbAdapter): Promise<TagCount[]> {
   );
 }
 
-/** Up to `limit` other hadith from the same book (cheap "related" list). */
-export async function relatedHadith(db: DbAdapter, id: string, book: string, limit = 5): Promise<HadithListItem[]> {
+/**
+ * Up to `limit` related hadith, picked the way the website picks them: the
+ * same باب from any book first, then neighbours in the same book.
+ */
+export async function relatedHadith(
+  db: DbAdapter,
+  id: string,
+  book: string,
+  limit = 5,
+  chapter?: string | null,
+): Promise<HadithListItem[]> {
+  const ch = chapter || null;
+  const spellings = await bookSpellings(db, book);
   return db.all<HadithListItem>(
-    `SELECT ${LIST_COLUMNS} FROM hadith WHERE book = ? AND id <> ?
-     ORDER BY abs(rowid - (SELECT rowid FROM hadith WHERE id = ?)) LIMIT ?`,
-    [book, id, id, limit],
+    `SELECT ${LIST_COLUMNS} FROM (
+       SELECT ${prefixed('h')}, 0 AS grp, h.rowid AS r FROM hadith h
+       WHERE ? IS NOT NULL AND h.chapter = ? AND h.id <> ?
+       UNION ALL
+       SELECT ${prefixed('h')}, 1, h.rowid FROM hadith h
+       WHERE ${bookFilter(spellings)} AND h.id <> ? AND (? IS NULL OR h.chapter IS NOT ?)
+     )
+     ORDER BY grp, abs(r - (SELECT rowid FROM hadith WHERE id = ?)) LIMIT ?`,
+    [ch, ch, id, ...spellings, id, ch, ch, id, limit],
   );
+}
+
+// ---- narrators ---------------------------------------------------------------
+
+interface NarratorDbRow {
+  slug: string;
+  name: string;
+  aliases_json: string;
+  death_note: string | null;
+  death_year: number | null;
+  century: number | null;
+}
+
+function jsonList(value: string | null | undefined): string[] {
+  try {
+    const list = JSON.parse(value ?? '[]') as unknown;
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+const toNarrator = (r: NarratorDbRow): Narrator => ({
+  slug: r.slug,
+  name: r.name,
+  aliases: jsonList(r.aliases_json),
+  death_note: r.death_note,
+  death_year: r.death_year,
+  century: r.century,
+});
+
+export interface NarratorListItem extends Narrator {
+  study_count: number;
+  hadith_count: number;
+}
+
+/** Every narrator, with how many studies and narrations on this device are about him. */
+export async function listNarrators(db: DbAdapter): Promise<NarratorListItem[]> {
+  const counts = await db.all<{ slug: string; studies: number; hadith: number }>(
+    `SELECT json_extract(j.value, '$.slug') AS slug, count(*) AS studies, count(DISTINCT h.id) AS hadith
+     FROM hadith h, json_each(h.narrators_json) j WHERE h.narrators_json <> '[]' GROUP BY 1`,
+  );
+  const bySlug = new Map(counts.map((c) => [c.slug, c]));
+  const rows = await db.all<NarratorDbRow>(
+    'SELECT * FROM narrators ORDER BY death_year IS NULL, death_year, name',
+  );
+  return rows
+    .map((r) => ({
+      ...toNarrator(r),
+      study_count: Number(bySlug.get(r.slug)?.studies ?? 0),
+      hadith_count: Number(bySlug.get(r.slug)?.hadith ?? 0),
+    }))
+    .filter((n) => n.study_count > 0);
+}
+
+/** How many studies there are and in how many narrations (each counted once). */
+export async function narratorTotals(db: DbAdapter): Promise<{ studies: number; hadith: number }> {
+  const row = await db.get<{ studies: number; hadith: number }>(
+    `SELECT count(*) AS studies, count(DISTINCT h.id) AS hadith
+     FROM hadith h, json_each(h.narrators_json) j
+     WHERE h.narrators_json <> '[]' AND json_extract(j.value, '$.slug') IN (SELECT slug FROM narrators)`,
+  );
+  return { studies: Number(row?.studies ?? 0), hadith: Number(row?.hadith ?? 0) };
+}
+
+export async function getNarrator(db: DbAdapter, slug: string): Promise<Narrator | undefined> {
+  const row = await db.get<NarratorDbRow>('SELECT * FROM narrators WHERE slug = ?', [slug]);
+  return row ? toNarrator(row) : undefined;
+}
+
+export interface NarratorStudy {
+  hadith: HadithListItem & { html_content: string };
+  /** Sections start…end (inclusive) of the narration are the study. */
+  start: number;
+  end: number;
+}
+
+/** Where one narrator is studied: which sections of which narrations. */
+export async function narratorStudies(db: DbAdapter, slug: string): Promise<NarratorStudy[]> {
+  const rows = await db.all<HadithListItem & { html_content: string; s: number; e: number }>(
+    `SELECT ${prefixed('h')}, h.html_content,
+       json_extract(j.value, '$.start') AS s, json_extract(j.value, '$.end') AS e
+     FROM hadith h, json_each(h.narrators_json) j
+     WHERE h.narrators_json <> '[]' AND json_extract(j.value, '$.slug') = ?
+     ORDER BY h.rowid, s`,
+    [slug],
+  );
+  return rows.map(({ s, e, ...hadith }) => ({ hadith, start: Number(s), end: Number(e) }));
+}
+
+/** The narrators studied in one narration, with their names, in the order of the text. */
+export async function hadithNarrators(
+  db: DbAdapter,
+  narratorsJson: string | null | undefined,
+): Promise<(NarratorRef & { name: string })[]> {
+  let refs: NarratorRef[];
+  try {
+    refs = narratorRefs(JSON.parse(narratorsJson ?? '[]'));
+  } catch {
+    return [];
+  }
+  if (refs.length === 0) return [];
+  const names = await db.all<{ slug: string; name: string }>(
+    `SELECT slug, name FROM narrators WHERE slug IN (${refs.map(() => '?').join(', ')})`,
+    refs.map((r) => r.slug),
+  );
+  const bySlug = new Map(names.map((n) => [n.slug, n.name]));
+  return refs.filter((r) => bySlug.has(r.slug)).map((r) => ({ ...r, name: bySlug.get(r.slug)! }));
+}
+
+// ---- registries --------------------------------------------------------------
+
+/** Replace the book, chapter and narrator registries (call inside a transaction). */
+export async function replaceRegistry(db: DbAdapter, registry: Registry): Promise<void> {
+  await db.run('DELETE FROM books');
+  for (const b of registry.books ?? []) {
+    await db.run(
+      `INSERT OR REPLACE INTO books (name, volume_no, sort_order, is_series, published_at, aliases_json, pdf_pages)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        b.name,
+        b.volume_no ?? null,
+        b.sort_order ?? null,
+        b.is_series ? 1 : 0,
+        b.published_at ?? null,
+        JSON.stringify(b.aliases ?? []),
+        b.pdf_pages ? 1 : 0,
+      ],
+    );
+  }
+  await db.run('DELETE FROM chapters');
+  for (const c of registry.chapters ?? []) {
+    await db.run('INSERT OR REPLACE INTO chapters (slug, name, parent, sort_order, description) VALUES (?, ?, ?, ?, ?)', [
+      c.slug,
+      c.name,
+      c.parent ?? null,
+      c.sort_order ?? null,
+      c.description ?? null,
+    ]);
+  }
+  await db.run('DELETE FROM narrators');
+  for (const n of registry.narrators ?? []) {
+    await db.run(
+      `INSERT OR REPLACE INTO narrators (slug, name, aliases_json, death_note, death_year, century)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [n.slug, n.name, JSON.stringify(n.aliases ?? []), n.death_note || null, n.death_year ?? null, n.century ?? null],
+    );
+  }
 }
 
 // ---- sync state ------------------------------------------------------------
@@ -250,9 +513,7 @@ export async function isBookmarked(db: DbAdapter, id: string): Promise<boolean> 
 
 export async function listBookmarks(db: DbAdapter): Promise<HadithListItem[]> {
   return db.all<HadithListItem>(
-    `SELECT ${LIST_COLUMNS.split(', ')
-      .map((c) => `h.${c}`)
-      .join(', ')} FROM bookmarks b JOIN hadith h ON h.id = b.id ORDER BY b.added_at DESC`,
+    `SELECT ${prefixed('h')} FROM bookmarks b JOIN hadith h ON h.id = b.id ORDER BY b.added_at DESC`,
   );
 }
 
@@ -270,11 +531,46 @@ export async function recordVisit(db: DbAdapter, id: string): Promise<void> {
 
 export async function listHistory(db: DbAdapter, limit = 20): Promise<HadithListItem[]> {
   return db.all<HadithListItem>(
-    `SELECT ${LIST_COLUMNS.split(', ')
-      .map((c) => `h.${c}`)
-      .join(', ')} FROM history v JOIN hadith h ON h.id = v.id ORDER BY v.opened_at DESC LIMIT ?`,
+    `SELECT ${prefixed('h')} FROM history v JOIN hadith h ON h.id = v.id ORDER BY v.opened_at DESC LIMIT ?`,
     [limit],
   );
+}
+
+/** What the reader made on this device and must survive a snapshot install. */
+export interface DeviceData {
+  bookmarks: { id: string; added_at: string }[];
+  history: { id: string; opened_at: string }[];
+  seenAnnouncements: { id: string; seen_at: string }[];
+}
+
+export async function exportDeviceData(db: DbAdapter): Promise<DeviceData> {
+  return {
+    bookmarks: await db.all('SELECT id, added_at FROM bookmarks'),
+    history: await db.all('SELECT id, opened_at FROM history'),
+    seenAnnouncements: await db.all('SELECT id, seen_at FROM announcements WHERE seen_at IS NOT NULL'),
+  };
+}
+
+/** Put device data back after the database file was replaced. Rows for hadith the new data no longer has are dropped. */
+export async function restoreDeviceData(db: DbAdapter, data: DeviceData): Promise<void> {
+  await db.transaction(async () => {
+    for (const b of data.bookmarks) {
+      await db.run(
+        'INSERT OR IGNORE INTO bookmarks (id, added_at) SELECT id, ? FROM hadith WHERE id = ?',
+        [b.added_at, b.id],
+      );
+    }
+    for (const h of data.history) {
+      await db.run(
+        `INSERT INTO history (id, opened_at) SELECT id, ? FROM hadith WHERE id = ?
+         ON CONFLICT(id) DO UPDATE SET opened_at = max(opened_at, excluded.opened_at)`,
+        [h.opened_at, h.id],
+      );
+    }
+    for (const a of data.seenAnnouncements) {
+      await db.run('UPDATE announcements SET seen_at = ? WHERE id = ?', [a.seen_at, a.id]);
+    }
+  });
 }
 
 export async function getSetting(db: DbAdapter, key: string): Promise<string | null> {

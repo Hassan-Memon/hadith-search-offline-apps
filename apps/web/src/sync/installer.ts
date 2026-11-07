@@ -3,7 +3,7 @@
 // and hand the database file to the SQLite worker.
 import type { SnapshotInfo, SnapshotInstaller } from '@tehqeqat/core';
 
-import { db } from '../db/client';
+import type { DbSession } from '../db/client';
 
 async function download(url: string, expected: number, onProgress: (f: number) => void): Promise<Uint8Array> {
   const res = await fetch(url, { cache: 'no-store' });
@@ -38,12 +38,19 @@ async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-export const browserInstaller: SnapshotInstaller = {
-  async install(snapshot: SnapshotInfo, onProgress) {
-    const gz = await download(snapshot.url, snapshot.bytes, onProgress);
-    const digest = await sha256Hex(gz);
-    if (digest !== snapshot.sha256.toLowerCase()) throw new Error('snapshot checksum mismatch');
-    const file = await gunzip(gz);
-    await db.importDb(file);
-  },
-};
+/**
+ * Installer bound to one sync's database session: if the database moved to
+ * another window during the download, the import is refused instead of
+ * overwriting what that window did meanwhile.
+ */
+export function browserInstaller(session: DbSession): SnapshotInstaller {
+  return {
+    async install(snapshot: SnapshotInfo, onProgress) {
+      const gz = await download(snapshot.url, snapshot.bytes, onProgress);
+      const digest = await sha256Hex(gz);
+      if (digest !== snapshot.sha256.toLowerCase()) throw new Error('snapshot checksum mismatch');
+      const file = await gunzip(gz);
+      await session.importDb(file);
+    },
+  };
+}

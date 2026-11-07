@@ -475,3 +475,99 @@ fieldset label { display: flex; gap: 8px; align-items: center; min-height: 40px;
 .progress { width: 100%; display: flex; flex-direction: column; gap: 6px; }
 .progress__bar { height: 10px; background: var(--line); border-radius: 999px; overflow: hidden; }
 .progress__bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.2s; }
+
+/* ---------- chapters, narrators, reader tools (1.2) ---------- */
+.block { display: block; }
+.section__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chip--link { border: 1px solid transparent; cursor: pointer; font: inherit; font-size: 0.85rem; }
+.chip--link[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); }
+.chip--soft { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.hadith-card__chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.btn--small { min-height: 36px; padding: 2px 12px; font-size: 0.9rem; }
+.seg--small button { min-height: 36px; padding: 2px 12px; }
+.seg--small button:disabled { opacity: 0.4; cursor: default; }
+.btn:disabled { opacity: 0.6; cursor: default; }
+
+.tiles { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.tile { align-items: flex-start; text-align: start; padding: 14px 16px; }
+.tile__label { font-weight: 700; }
+.tile__text { color: var(--muted); font-size: 0.85rem; line-height: 1.9; }
+@media (max-width: 520px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .tile__text { display: none; }
+  .tile { align-items: center; text-align: center; }
+}
+
+.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.filters label { display: flex; flex-direction: column; gap: 2px; font-size: 0.85rem; color: var(--muted); flex: 1 1 200px; min-width: 0; }
+.filters select {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-height: 42px;
+  padding: 2px 10px;
+  width: 100%;
+}
+
+.chapter-grid, .narrator-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.chapter-card, .narrator-card { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; color: var(--ink); height: 100%; }
+.chapter-card:hover, .narrator-card:hover { text-decoration: none; border-color: var(--accent); }
+.chapter-card__name { font-weight: 700; color: var(--accent); }
+.chapter-card__desc { font-size: 0.85rem; color: var(--muted); line-height: 1.9; }
+.narrator-card__name { font-size: calc(var(--text-size) * 0.95); line-height: 2.1; }
+.searchbox--small input { min-height: 44px; }
+
+.studies { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.study { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.study .eyebrow { margin: 0; }
+.study__title { color: var(--ink); }
+.study__title .urdu { font-size: calc(var(--text-size) * 1.02); line-height: 2.2; }
+.study__title .urdu * { text-align: start !important; font-size: inherit !important; margin: 0; }
+.study__heading { font-size: calc(var(--text-size) * 1.02); color: var(--accent); font-weight: 400; line-height: 2.2; }
+.study__heading * { margin: 0; font-size: inherit !important; }
+.study-link { margin: 0; padding: 0 16px 6px; }
+.study-link .chip { white-space: normal; }
+
+.section-fold { scroll-margin-top: 80px; }
+.toc summary { display: flex; align-items: center; gap: 6px; }
+.toc a .chip { margin-inline-start: auto; font-size: 0.75rem; line-height: 1.8; }
+
+@media print {
+  .topbar, .tabbar, .announce, .no-print, .crumbs { display: none !important; }
+  body { background: #fff; color: #000; }
+  .main { padding: 0; }
+  .section-fold { border: 0; }
+  .section-fold summary::before { content: none; }
+  a { color: inherit; }
+}
+
+/* ---------- تعارف: preface of part 2 ---------- */
+.center { text-align: center; }
+.preface h3 { font-size: calc(var(--text-size) * 1.15); color: var(--accent); text-align: center; margin-bottom: 10px; }
+.preface--tinted { background: linear-gradient(var(--accent-soft), var(--surface) 240px); }
+.preface .verse { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 40px; }
+.preface blockquote { margin: 0 0 0.9em; padding: 8px 14px; border-inline-start: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 10px 10px 0; }
+.points { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.points > li { display: flex; gap: 12px; }
+.points > li > div { min-width: 0; }
+.points__n {
+  flex-shrink: 0;
+  width: 2em;
+  height: 2em;
+  margin-top: 0.4em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  color: var(--accent);
+  font-family: var(--ui);
+  font-size: 0.8em;
+  line-height: 1;
+}
+.preface__sign { text-align: end; margin-top: 18px; }
+.preface__sign p { margin: 0; }

@@ -5,12 +5,17 @@ import { ensureSchema, SCHEMA_VERSION } from '../db/migrate.js';
 import {
   countHadith,
   deleteHadith,
+  exportDeviceData,
+  getSetting,
   getSyncState,
   replaceAnnouncements,
+  restoreDeviceData,
   replaceFiles,
+  replaceRegistry,
   setCursor,
   setSetting,
   setSyncResult,
+  updateHadithMeta,
   upsertHadith,
 } from '../db/repo.js';
 import type { Manifest, SnapshotInfo } from '../types.js';
@@ -101,12 +106,15 @@ export async function sync(opts: SyncOptions): Promise<SyncResult> {
 
     if (opts.installer && manifest.snapshot && usableSnapshot(manifest.snapshot) && (fresh || farBehind || opts.forceSnapshot)) {
       try {
+        // The snapshot replaces the whole file, bookmarks and history included.
+        const kept = await exportDeviceData(db);
         report({ phase: 'snapshot-download', fraction: 0 });
         await opts.installer.install(manifest.snapshot, (fraction) =>
           report({ phase: 'snapshot-download', fraction }),
         );
         report({ phase: 'snapshot-install' });
         await ensureSchema(db);
+        await restoreDeviceData(db, kept);
         state = await getSyncState(db);
         usedSnapshot = true;
       } catch (error) {
@@ -129,10 +137,11 @@ export async function sync(opts: SyncOptions): Promise<SyncResult> {
         const page = await api.getChanges(cursor, limit);
         await db.transaction(async () => {
           for (const item of page.items) await upsertHadith(db, item);
+          for (const meta of page.meta ?? []) await updateHadithMeta(db, meta);
           for (const tomb of page.deleted) await deleteHadith(db, tomb.id);
           await setCursor(db, page.next_cursor);
         });
-        applied += page.items.length;
+        applied += page.items.length + (page.meta?.length ?? 0);
         deleted += page.deleted.length;
         cursor = page.next_cursor;
         report({
@@ -142,6 +151,22 @@ export async function sync(opts: SyncOptions): Promise<SyncResult> {
         });
         if (!page.has_more || page.next_cursor === '' ) break;
         if (isCaughtUp(cursor, manifest.latest_cursor)) break;
+      }
+    }
+
+    // Books, chapters and narrators: downloaded only when they changed.
+    let registryUpdated = false;
+    const registry = manifest.registry;
+    if (registry?.sha256 && api.getRegistry && registry.sha256 !== (await getSetting(db, REGISTRY_SETTING))) {
+      try {
+        const data = await api.getRegistry(registry.url);
+        await db.transaction(async () => {
+          await replaceRegistry(db, data);
+          await setSetting(db, REGISTRY_SETTING, registry.sha256);
+        });
+        registryUpdated = true;
+      } catch {
+        // Non-fatal: the next sync tries again; screens show the old lists.
       }
     }
 
@@ -163,7 +188,7 @@ export async function sync(opts: SyncOptions): Promise<SyncResult> {
     await setSetting(db, 'data_generated_at', manifest.generated_at);
     await setSyncResult(db, 'ok');
     report({ phase: 'done', fraction: 1 });
-    if (applied === 0 && deleted === 0 && !usedSnapshot) return { status: 'up-to-date', cursor, hadith };
+    if (applied === 0 && deleted === 0 && !usedSnapshot && !registryUpdated) return { status: 'up-to-date', cursor, hadith };
     return { status: 'ok', applied, deleted, cursor, usedSnapshot, hadith };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -175,6 +200,9 @@ export async function sync(opts: SyncOptions): Promise<SyncResult> {
     return { status: 'error', error: message };
   }
 }
+
+/** Setting holding the sha256 of the registry file this device has applied. */
+export const REGISTRY_SETTING = 'registry_sha256';
 
 function usableSnapshot(snapshot: SnapshotInfo): boolean {
   return Boolean(snapshot.url && snapshot.sha256) && snapshot.schema_version <= SCHEMA_VERSION;

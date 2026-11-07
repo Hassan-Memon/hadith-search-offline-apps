@@ -1,21 +1,33 @@
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router';
+import { lazy, Suspense } from 'react';
+
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router';
 
 import { Shell } from './components/Shell';
 import { BASE } from './config';
-import { AboutPage } from './pages/About';
 import { HadithPage } from './pages/Hadith';
-import { AllPage, BookPage, BooksPage } from './pages/Lists';
+import { AllPage, BookPage, BooksPage, ChapterPage, ChaptersPage } from './pages/Lists';
 import { LibraryPage, MorePage } from './pages/More';
 import { SavedPage } from './pages/Saved';
 import { HomePage, SearchPage } from './pages/Search';
 import { t } from './strings';
-import { runSync, useApp } from './sync/store';
+import { retryOpen, runSync, useApp } from './sync/store';
+
+// The تعارف page carries long texts and the scans' URLs: its own chunk, so
+// the app starts without it (the service worker still caches it on install).
+const AboutPage = lazy(() => import('./pages/About').then((m) => ({ default: m.AboutPage })));
+const NarratorsPage = lazy(() => import('./pages/Narrators').then((m) => ({ default: m.NarratorsPage })));
+const NarratorPage = lazy(() => import('./pages/Narrators').then((m) => ({ default: m.NarratorPage })));
 
 // Website URLs map onto app URLs, so a shared /hadees-detail/<slug> link
 // opened in the app lands on the same narration.
 function LegacyDetail() {
   const { slug = '' } = useParams();
   return <Navigate to={`/hadith/${slug}`} replace />;
+}
+
+function LegacySearch() {
+  const { search } = useLocation();
+  return <Navigate to={`/search${search}`} replace />;
 }
 
 function FirstRun() {
@@ -55,9 +67,36 @@ function FirstRun() {
   );
 }
 
+/** Shown for the moment it takes to open the database on a normal start. */
+function Opening() {
+  return (
+    <div className="firstrun" aria-busy="true">
+      <img src={`${BASE}icons/mark.svg`} alt="" width="72" height="72" />
+      <h1>{t.appName}</h1>
+      <p className="muted small">{t.sync.opening}</p>
+    </div>
+  );
+}
+
+/** Another window or tab of the app kept the database. */
+function Busy() {
+  return (
+    <div className="firstrun">
+      <img src={`${BASE}icons/mark.svg`} alt="" width="72" height="72" />
+      <h1>{t.appName}</h1>
+      <p>{t.sync.busy}</p>
+      <button type="button" className="btn btn--primary" onClick={retryOpen}>
+        {t.sync.retry}
+      </button>
+    </div>
+  );
+}
+
 export function App() {
-  const { dbReady, hadithCount, fatal } = useApp();
-  if (!dbReady || hadithCount === 0 || fatal) return <FirstRun />;
+  const { dbReady, dbBusy, hadithCount, fatal } = useApp();
+  if (dbBusy) return <Busy />;
+  if (fatal || (dbReady && hadithCount === 0)) return <FirstRun />;
+  if (!dbReady) return <Opening />;
   return (
     <BrowserRouter basename={BASE.replace(/\/$/, '') || '/'}>
       <Shell>
@@ -69,7 +108,36 @@ export function App() {
           <Route path="/books/:book" element={<BookPage />} />
           <Route path="/hadith/:slug" element={<HadithPage />} />
           <Route path="/hadees-detail/:slug" element={<LegacyDetail />} />
-          <Route path="/about" element={<AboutPage />} />
+          <Route path="/chapters" element={<ChaptersPage />} />
+          <Route path="/chapters/:slug" element={<ChapterPage />} />
+          <Route
+            path="/narrators"
+            element={
+              <Suspense fallback={null}>
+                <NarratorsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/narrators/:slug"
+            element={
+              <Suspense fallback={null}>
+                <NarratorPage />
+              </Suspense>
+            }
+          />
+          {/* The website's paths, for links shared from it. */}
+          <Route path="/all-hadees" element={<Navigate to="/all" replace />} />
+          <Route path="/search-hadees" element={<LegacySearch />} />
+          <Route path="/topics" element={<Navigate to="/chapters" replace />} />
+          <Route
+            path="/about"
+            element={
+              <Suspense fallback={null}>
+                <AboutPage />
+              </Suspense>
+            }
+          />
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/more" element={<MorePage />} />
           <Route path="/library" element={<LibraryPage />} />

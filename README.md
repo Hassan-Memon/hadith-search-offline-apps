@@ -1,8 +1,11 @@
 # تحقیقاتِ حدیث — offline app
 
-The whole tehqeqatehadees.com collection on the reader's own device: search,
-all narrations, books, the تعارف page with the تقاریظ, bookmarks and history,
-with or without internet. New and edited narrations arrive automatically.
+The whole tehqeqatehadees.com collection on the reader's own device: search
+(with book and باب filters), all narrations, books, ابواب (chapters), رواۃ
+(narrators), the تعارف page with the تقاریظ and the part-2 preface,
+bookmarks and history, with or without internet. Each narration can be
+copied, saved as a Word file or printed. New and edited narrations arrive
+automatically.
 
 One installable web app (PWA) covers every platform, with no store fees and no
 new server:
@@ -38,18 +41,31 @@ tehqeqatehadees.com (unchanged)          GitHub Actions, every hour         the 
   hadith publishes nothing and opens a "Data build failing" issue. The app
   keeps the last good data. After an urgent correction, Actions → "Deploy app
   and data" → Run workflow publishes it within minutes.
-- **First start** downloads one gzipped SQLite snapshot (about 10 MB), checks
-  its sha256 and stores it on the device (about 42 MB).
+- **First start** downloads one gzipped SQLite snapshot (about 9.5 MB), checks
+  its sha256 and stores it on the device (about 42 MB). It stays there across
+  restarts and reloads. Only one window can hold it at a time, so with the
+  installed app and a browser tab both open, the one in front takes it over
+  (Web Lock) and the other closes its copy; nothing is downloaded twice.
+  Bookmarks and history are carried over when a new snapshot is installed.
 - **After that** the app reads the small change files: on start, every 6 hours
   while open, when the device comes back online, and when the app returns to
   the foreground. Deletions arrive too.
 - **Search** runs on the device: Urdu/Arabic normaliser (ی/ي، ک/ك، ہ/ه/ۃ،
   harakat), ranked phrase → all words → any word.
+- **Books, chapters and narrators** come from the website's registries
+  (`/api/books`, `/api/chapters`, `/api/narrators`). Devices download them
+  only when they change. A narrator's page is built on the device from the
+  sections of the narrations that study him; nothing extra is downloaded.
 - **The app itself** is cached by a service worker, so it opens with no
-  connection. A new version installs in the background and applies on the
-  next start: no store review, no reinstall.
+  connection. A new version downloads in the background (checked hourly and
+  when the app returns to the foreground) and switches over when the app goes
+  to the background, or at once from the "update now" banner. It never
+  reloads under the reader. If the published data needs a newer app
+  (`min_app_version`), it updates straight away. No store review, no
+  reinstall.
 
-Details: `packages/core/README.md`.
+Details: `packages/core/README.md`. What 1.2.0 brought over from the website,
+with size and speed measurements: `docs/1.2.0-website-updates.md`.
 
 ## Repository layout
 
@@ -58,7 +74,12 @@ apps/web/          the app (Vite + React + TypeScript, vite-plugin-pwa, @sqlite.
 packages/core/     shared logic: types, normaliser, SQLite schema, search, sync engine (+ tests)
 packages/assets/   fonts (from the website) and the تعارف images
 packages/i18n/     the website's ur/en/ar strings (for later languages)
+docs/              release notes in depth (what changed, why, measurements)
 ```
+
+Inside the app: `src/pages/` (one file per screen; تعارف and رواۃ load as
+their own chunks), `src/export/` (copy text and Word file, copied from the
+website and loaded only when used), `src/db/` (SQLite worker), `src/sync/`.
 
 
 ## Develop
@@ -68,12 +89,13 @@ Requirements: Node 26 and pnpm 12.
 ```bash
 pnpm install
 pnpm test                 # core: normaliser, search, sync engine, data builder
+                          # (Node < 26: node --test packages/core/dist/test/*.test.js)
 pnpm data:local           # build data from a local website on :3000 into apps/web/public/data
 pnpm dev                  # app on http://localhost:5173
 ```
 
-To build data from the live website instead (about 1,000 requests the first
-time, only when you really need it):
+To build data from the live website instead (about 1,000 requests and ~8
+minutes the first time, only when you really need it):
 
 ```bash
 pnpm --filter @tehqeqat/core build
