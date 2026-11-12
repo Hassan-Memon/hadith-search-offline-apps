@@ -14,6 +14,7 @@ import {
 } from '@tehqeqat/core';
 
 import { bookPath, chapterPath, HadithCard, HadithList } from '../components/HadithCard';
+import { Icon } from '../components/Icon';
 import { PageTitle } from '../components/Shell';
 import { PAGE_SIZE } from '../config';
 import { db } from '../db/client';
@@ -52,11 +53,12 @@ function ChapterSamples() {
   return (
     <section className="section">
       <div className="section__head">
-        <h2>{t.chapters.samples}</h2>
+        <h2 className="section-title">{t.chapters.samples}</h2>
         <Link to="/chapters" className="link-strong">
           {t.chapters.allChapters} ←
         </Link>
       </div>
+      <p className="muted small">{t.chapters.samplesNote(items.length)}</p>
       <ol className="hadith-list">
         {items.slice(0, shown).map((item) => (
           <li key={item.id}>
@@ -86,20 +88,22 @@ export function AllPage() {
   const series = books.data ? groupBooks(books.data).series : [];
   return (
     <div className="page">
-      <PageTitle title={t.nav.all} />
+      <PageTitle title={t.nav.all} sub={t.allPage.description} />
       {series.length > 0 && (
         <section className="section">
-          <h2>{t.chapters.chooseBook}</h2>
-          <ul className="chips" aria-label={t.books.series}>
+          <h2 className="section-title">{t.chapters.chooseBook}</h2>
+          <p className="muted small">{t.books.series}</p>
+          <ul className="volume-pills" aria-label={t.books.series}>
             {series.map((s) => (
               <li key={s.book}>
-                <Link to={bookPath(s.book)} className="chip chip--link">
-                  {s.label}
+                <Link to={bookPath(s.book)} className="volume-pill">
+                  <span className="volume-pill__label">{s.label}</span>
+                  <span className="volume-pill__count">{fmt(s.count)}</span>
                 </Link>
               </li>
             ))}
             <li>
-              <Link to="/books" className="chip chip--link">
+              <Link to="/books" className="volume-pill volume-pill--more">
                 {t.books.others} ←
               </Link>
             </li>
@@ -108,7 +112,7 @@ export function AllPage() {
       )}
       <ChapterSamples />
       <section className="section">
-        <h2>{t.nav.all}</h2>
+        <h2 className="section-title">{t.nav.all}</h2>
         <PagedList />
       </section>
     </div>
@@ -125,18 +129,13 @@ export function BookPage() {
   return (
     <div className="page">
       <nav className="crumbs">
+        <Link to="/">{t.hadith.home}</Link>
         <Link to="/books">{t.books.title}</Link>
       </nav>
       <PageTitle
         title={name}
-        sub={
-          <>
-            {t.books.intro}
-            {info.data?.published_at && (
-              <span className="muted small block">{t.books.published(fmtDay(info.data.published_at))}</span>
-            )}
-          </>
-        }
+        sub={t.books.intro}
+        note={info.data?.published_at ? t.books.published(fmtDay(info.data.published_at)) : undefined}
       />
       <PagedList book={name} />
     </div>
@@ -151,9 +150,9 @@ export function BooksPage() {
   for (const s of series) sameVolume.set(s.volume, (sameVolume.get(s.volume) ?? 0) + 1);
   return (
     <div className="page">
-      <PageTitle title={t.books.title} />
+      <PageTitle title={t.books.title} sub={t.books.description} />
       <section className="section">
-        <h2>{t.books.series}</h2>
+        <h2 className="section-title">{t.books.series}</h2>
         <p className="muted">{t.books.seriesNote}</p>
         <ul className="volumes">
           {series.map((s) => (
@@ -170,7 +169,7 @@ export function BooksPage() {
       </section>
       {others.length > 0 && (
         <section className="section">
-          <h2>{t.books.others}</h2>
+          <h2 className="section-title">{t.books.others}</h2>
           <ul className="others">
             {others.map((b) => (
               <li key={b.book}>
@@ -206,18 +205,25 @@ export function ChaptersPage() {
   }, []);
   return (
     <div className="page">
-      <PageTitle title={t.chapters.title} sub={t.chapters.intro} />
+      <PageTitle
+        title={t.chapters.title}
+        sub={t.chapters.intro}
+        note={chapters.data ? t.chapters.count(chapters.data.filter((c) => c.count > 0).length) : undefined}
+      />
       {chapters.data && groups.length === 0 && <p className="empty">{t.list.empty}</p>}
       {groups.map((g) => (
         <section key={g.parent} className="section">
-          <h2>{g.parent}</h2>
+          <h2 className="group-title">{g.parent}</h2>
           <ul className="chapter-grid">
             {g.chapters.map((c) => (
               <li key={c.slug}>
                 <Link to={chapterPath(c.slug)} className="card chapter-card">
                   <span className="chapter-card__name">{c.name}</span>
                   {c.description && <span className="chapter-card__desc">{c.description}</span>}
-                  <span className="muted small">{t.list.count(c.count)}</span>
+                  <span className="chapter-card__foot">
+                    <span>{t.list.count(c.count)}</span>
+                    <Icon name="arrow" />
+                  </span>
                 </Link>
               </li>
             ))}
@@ -241,6 +247,7 @@ export function ChapterPage() {
   return (
     <div className="page">
       <nav className="crumbs">
+        <Link to="/">{t.hadith.home}</Link>
         <Link to="/chapters">{t.chapters.title}</Link>
         {chapter.data.parent && <span>{chapter.data.parent}</span>}
       </nav>

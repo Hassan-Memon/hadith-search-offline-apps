@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type CSSProperties, type FormEvent, useEffect, useState } from 'react';
 
 import { Link, useNavigate, useSearchParams } from 'react-router';
 
@@ -13,8 +13,11 @@ import {
   type SearchResult,
 } from '@tehqeqat/core';
 
+import heroImage from '@assets/images/hero.webp';
+
 import { HadithCard, HadithList } from '../components/HadithCard';
 import { Icon, type IconName } from '../components/Icon';
+import { PageTitle, SiteFooter } from '../components/Shell';
 import { PAGE_SIZE } from '../config';
 import { db } from '../db/client';
 import { useChapterNames, useQuery } from '../hooks';
@@ -36,11 +39,14 @@ export function SearchBox({
   autoFocus = false,
   book = '',
   chapter = '',
+  hero = false,
 }: {
   initial?: string;
   autoFocus?: boolean;
   book?: string;
   chapter?: string;
+  /** The home page's box on the dark picture: the button stands apart, as on the website. */
+  hero?: boolean;
 }) {
   const [value, setValue] = useState(initial);
   const navigate = useNavigate();
@@ -51,7 +57,7 @@ export function SearchBox({
     if (q || book || chapter) navigate(searchHref(q, book, chapter));
   };
   return (
-    <form className="searchbox" role="search" onSubmit={submit}>
+    <form className={`searchbox ${hero ? 'searchbox--hero' : ''}`} role="search" onSubmit={submit}>
       <label htmlFor="q" className="sr-only">
         {t.search.placeholder}
       </label>
@@ -72,13 +78,14 @@ export function SearchBox({
   );
 }
 
+// «یہاں کیا ہے؟»: the website's six cards (the app's «محفوظ» is in the bottom bar).
 const CARDS: { to: string; icon: IconName; label: string; text: string }[] = [
-  { to: '/all', icon: 'list', label: t.nav.all, text: t.home.cards.all },
-  { to: '/chapters', icon: 'layers', label: t.nav.chapters, text: t.home.cards.chapters },
+  { to: '/search', icon: 'search', label: t.search.title, text: t.home.cards.search },
+  { to: '/all', icon: 'book-open', label: t.nav.all, text: t.home.cards.all },
+  { to: '/chapters', icon: 'grid', label: t.nav.chapters, text: t.home.cards.chapters },
   { to: '/narrators', icon: 'users', label: t.nav.narrators, text: t.home.cards.narrators },
-  { to: '/books', icon: 'book', label: t.nav.books, text: t.home.cards.books },
+  { to: '/books', icon: 'library', label: t.nav.books, text: t.home.cards.books },
   { to: '/about', icon: 'info', label: t.nav.about, text: t.home.cards.about },
-  { to: '/saved', icon: 'bookmark', label: t.nav.saved, text: t.home.cards.saved },
 ];
 
 export function HomePage() {
@@ -89,30 +96,45 @@ export function HomePage() {
   const volumes = books.data ? new Set(groupBooks(books.data).series.map((s) => s.volume)).size : 0;
   return (
     <div className="home">
-      <section className="hero">
-        <h1>{t.appTagline}</h1>
-        <SearchBox />
-        <p className="hero__meta">
-          {hadithCount > 0 && t.home.stats(hadithCount, volumes)} · {t.search.hint}
-        </p>
+      <section className="hero" style={{ '--hero-image': `url(${heroImage})` } as CSSProperties}>
+        <div className="hero__inner">
+          <h1>{t.appTagline}</h1>
+          <p className="hero__text">{t.heroDescription}</p>
+          <SearchBox hero />
+          {hadithCount > 0 && (
+            <p className="hero__meta">
+              {t.home.stats(hadithCount, volumes)} · {t.search.hint}
+            </p>
+          )}
+        </div>
       </section>
 
-      <section className="tiles" aria-label={t.home.explore}>
-        {CARDS.map((c) => (
-          <Link key={c.to} to={c.to} className="tile">
-            <Icon name={c.icon} />
-            <span className="tile__label">{c.label}</span>
-            <span className="tile__text">{c.text}</span>
-          </Link>
-        ))}
+      <section className="explore">
+        <h2>{t.home.explore}</h2>
+        <ul className="nav-cards">
+          {CARDS.map((c) => (
+            <li key={c.to}>
+              <Link to={c.to} className="nav-card">
+                <span className="nav-card__icon">
+                  <Icon name={c.icon} />
+                </span>
+                <span className="nav-card__body">
+                  <span className="nav-card__title">{c.label}</span>
+                  <span className="nav-card__text">{c.text}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {history.data && history.data.length > 0 && (
-        <section className="section">
-          <h2>{t.home.recent}</h2>
+        <section className="section home__recent">
+          <h2 className="section-title">{t.home.recent}</h2>
           <HadithList items={history.data} />
         </section>
       )}
+      <SiteFooter />
     </div>
   );
 }
@@ -125,7 +147,7 @@ function Filters({ q, book, chapter }: { q: string; book: string; chapter: strin
   return (
     <div className="filters">
       <label>
-        <span>{t.search.filterBook}</span>
+        <span>{t.search.filterBook}:</span>
         <select value={book} onChange={(e) => navigate(searchHref(q, e.target.value, chapter), { replace: true })}>
           <option value="">{t.search.allBooks}</option>
           {(books.data ?? []).map((b) => (
@@ -137,7 +159,7 @@ function Filters({ q, book, chapter }: { q: string; book: string; chapter: strin
       </label>
       {usedChapters.length > 0 && (
         <label>
-          <span>{t.search.filterChapter}</span>
+          <span>{t.search.filterChapter}:</span>
           <select
             value={chapter}
             onChange={(e) => navigate(searchHref(q, book, e.target.value), { replace: true })}
@@ -179,16 +201,39 @@ export function SearchPage() {
   const chapterNames = useChapterNames();
   const hits: SearchHit[] = result.data?.hits ?? [];
   const shown = (q.trim() || filtered) && result.data;
+  useEffect(() => {
+    document.title = `${q.trim() ? `${q.trim()} | ` : ''}${t.search.title} | ${t.appName}`;
+  }, [q]);
   return (
     <div className="page">
-      <SearchBox initial={q} book={book} chapter={chapter} />
-      <Filters q={q} book={book} chapter={chapter} />
+      <PageTitle title={t.search.title} sub={t.search.description}>
+        <SearchBox initial={q} book={book} chapter={chapter} autoFocus={!q && !filtered} />
+        <Filters q={q} book={book} chapter={chapter} />
+        {!q.trim() && (
+          <ul className="examples" aria-label={t.search.examples}>
+            <li className="examples__label">{t.search.examples}</li>
+            {t.search.exampleWords.map((word) => (
+              <li key={word}>
+                <Link to={searchHref(word, book, chapter)} className="example">
+                  {word}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </PageTitle>
       {shown && (
         <p className="result-count" aria-live="polite">
           {t.search.results(result.data!.total)}
         </p>
       )}
-      {shown && result.data!.total === 0 && <p className="empty">{t.search.none}</p>}
+      {shown && result.data!.relaxed && <p className="note">{t.search.relaxed}</p>}
+      {shown && result.data!.total === 0 && (
+        <div className="empty">
+          <p className="empty__title">{t.search.none}</p>
+          <p>{t.search.noneHint}</p>
+        </div>
+      )}
       {hits.length > 0 && (
         <ol className="hadith-list">
           {hits.map((h) => (

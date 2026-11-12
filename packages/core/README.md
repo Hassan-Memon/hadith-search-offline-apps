@@ -109,18 +109,32 @@ sections hold the same text); snippets are cut from the sections. Result: a
 
 The full-text index (`hadith_fts`, FTS5) holds normalised text, and queries
 are normalised the same way, so «نماز», «نَمَازِ» and «نمــاز» all match.
-Ranking: exact phrase, then all words, then any word; bm25 within each.
+Matching follows the website (since 11 Nov 2026): a narration must hold most
+of the typed words (up to two words all of them, longer queries 75%), or one
+common word such as «کا» would match every narration. When that finds fewer
+than three, a word's ending may differ (خطبہ/خطبے), and then half the words
+are enough; `SearchResult.relaxed` says so and the app shows the website's
+note. Ranking: the exact phrase, then the words within three of each other,
+then more of the words, then bm25 (title words weigh more). Each full-text
+query runs once (`MATERIALIZED`), and only ids are sorted: the text is read
+for the page's rows alone.
 
 ## SQLite
 
 `schema.sql` is the single source of truth (`PRAGMA user_version` = schema
 version, embedded at build time into `src/db/schema.generated.ts`). Changing
 it: bump `user_version`, add a migration in `src/db/migrate.ts` (migrations
-run before `schema.sql`, so new indexes can use new columns). The next data
-build then starts over with a full build, and devices reinstall the snapshot.
+run before `schema.sql`, so new indexes can use new columns). A change that
+needs the hadith rows rebuilt also needs a full data build (devices reinstall
+the snapshot). A change that only adds columns can be upgraded in place: raise
+`FIRST_UPGRADABLE_SCHEMA` in `src/build/data.ts` only when it cannot.
 
 Schema 2 (app 1.2.0) added `hadith.chapter`, `hadith.narrators_json`, the
 `books`, `chapters` and `narrators` tables and the `book_spelling` view.
+Schema 3 (app 1.3.0) added `narrators.arabic_name` and `narrators.excerpt`
+(from the registry). Its migration also forgets the registry's checksum, so a
+device downloads the registry once more and keeps everything else; the
+builder upgraded the published snapshot in place (same epoch).
 Keep small columns **before** `html_content`. SQLite reads a row's columns in
 order, so a column after the narration text is reached only by reading
 through it. Filtering by a book uses its spellings as a plain `IN (…)` list

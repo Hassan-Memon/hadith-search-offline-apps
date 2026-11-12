@@ -8,6 +8,10 @@ import {
   countHadith,
   deleteHadith,
   getHadithBySlug,
+  getNarrator,
+  getSetting,
+  latestFirst,
+  narratorSortKey,
   listBooks,
   listChapters,
   listBookmarks,
@@ -96,12 +100,13 @@ test('upsert, list, books, tags, delete', async () => {
   db.close();
 });
 
-test('search ranks phrase, then all words, then any word; normalisation applies', async () => {
+test('search needs most words, loosens only when it finds too little; normalisation applies', async () => {
   const db = await freshDb();
   const r = await searchHadith(db, 'نماز جنازہ');
-  // a: phrase «نماز جنازہ» (original has نمازِ with kasra); b and c: one word each.
-  assert.deepEqual(r.hits[0], { ...r.hits[0], id: 'a', tier: 0 });
-  assert.deepEqual(r.hits.slice(1).map((h) => h.tier), [2, 2]);
+  // Only a holds both words (as «نمازِ جنازہ», with kasra): fewer than three
+  // results, so half the words are enough and the page says so. a first.
+  assert.deepEqual(r.hits[0], { ...r.hits[0], id: 'a', tier: 2 });
+  assert.equal(r.relaxed, true);
   assert.deepEqual(r.hits.slice(1).map((h) => h.id).sort(), ['b', 'c']);
   // Tatweel/kasra-insensitive: «نمــاز» finds both documents with نماز (a and c).
   assert.equal((await searchHadith(db, 'نمــاز')).total, 2);
@@ -112,6 +117,18 @@ test('search ranks phrase, then all words, then any word; normalisation applies'
   assert.deepEqual((await searchHadith(db, 'نماز', { book: BOOK8 })).hits.map((h) => h.id), ['c']);
   // Empty query.
   assert.equal((await searchHadith(db, '  ')).total, 0);
+  // A common word alone matches what holds it, at the exact level.
+  const common = await searchHadith(db, 'روایت');
+  assert.equal(common.total, 3);
+  assert.equal(common.relaxed, false);
+  // Three words: two must be there. Only a and c have two (fewer than three
+  // results), so the search loosens; c holds all three and still comes first,
+  // and b, with none of them, is never listed.
+  const most = await searchHadith(db, 'نماز کی فضیلت');
+  assert.equal(most.hits[0]?.id, 'c');
+  assert.equal(most.hits[1]?.id, 'a');
+  assert.ok(!most.hits.some((h) => h.id === 'b'));
+  assert.equal(most.relaxed, true);
   // Snippet contains the original (with kasra) text.
   assert.match(r.hits[0]!.snippet, /نمازِ جنازہ/);
   db.close();
@@ -142,6 +159,38 @@ test('bookmarks and history', async () => {
   await deleteHadith(db, 'c');
   assert.equal((await listBookmarks(db)).length, 0);
   db.close();
+});
+
+test('a version 2 database (app 1.2) upgrades to version 3, keeps its rows and fetches the registry again', async () => {
+  const db = new NodeSqliteAdapter(':memory:');
+  await db.exec(`
+    CREATE TABLE narrators (slug TEXT PRIMARY KEY, name TEXT NOT NULL, aliases_json TEXT NOT NULL DEFAULT '[]',
+      death_note TEXT, death_year INTEGER, century INTEGER);
+    CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
+    INSERT INTO narrators (slug, name) VALUES ('زید', 'زید');
+    INSERT INTO settings VALUES ('registry_sha256', 'abc'), ('size', 'l');
+    PRAGMA user_version = 2;
+  `);
+  const r = await ensureSchema(db);
+  assert.deepEqual(r, { from: 2, to: SCHEMA_VERSION });
+  const n = await getNarrator(db, 'زید');
+  assert.equal(n?.name, 'زید');
+  assert.equal(n?.arabic_name, null);
+  assert.equal(await getSetting(db, 'registry_sha256'), null);
+  assert.equal(await getSetting(db, 'size'), 'l');
+  db.close();
+});
+
+test('a narrator\'s studies, latest volume first, then the fullest', () => {
+  const s = (id: string, rank: [number, number, string], chars: number) => ({ id, rank, chars });
+  const order = latestFirst(
+    [s('other-old', [0, 0, '2015-01-01'], 50), s('vol2', [1, 2, ''], 10), s('vol8-short', [1, 8, ''], 5), s('vol8-long', [1, 8, ''], 90), s('unknown', [-1, 0, ''], 999)],
+    (x) => x.chars,
+  );
+  assert.deepEqual(order.map((x) => x.id), ['vol8-long', 'vol8-short', 'vol2', 'other-old', 'unknown']);
+  // Sorted under the Arabic name without its diacritics, Urdu until there is one.
+  assert.equal(narratorSortKey({ name: 'ابان', arabic_name: 'أَبَانُ بْنُ أَبِي عَيَّاشٍ' }), 'ابانبنابیعیاش');
+  assert.equal(narratorSortKey({ name: 'ابو جعفر', arabic_name: null }), 'ابوجعفر');
 });
 
 test('a version 1 database (app 1.1) upgrades to version 2 and keeps its rows', async () => {

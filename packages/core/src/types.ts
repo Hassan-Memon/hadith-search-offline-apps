@@ -66,7 +66,7 @@ export interface HadithListItem {
 }
 
 export interface SearchHit extends HadithListItem {
-  /** 0 = phrase match, 1 = all words, 2 = any word. */
+  /** The search level that found it: 0 = exact words, 1 = endings loose, 2 = half the words (see search.ts). */
   tier: number;
   /** Plain-text excerpt around the first match in the body (original text). */
   snippet: string;
@@ -77,6 +77,8 @@ export interface SearchResult {
   page: number;
   pageSize: number;
   hits: SearchHit[];
+  /** The exact words found too little, so looser spellings or fewer words were used. */
+  relaxed?: boolean;
 }
 
 export interface BookCount {
@@ -102,11 +104,16 @@ export interface ChapterCount {
 
 export interface Narrator {
   slug: string;
+  /** Urdu name, as the research writes it. */
   name: string;
+  /** Arabic name with diacritics, as the book's «فہرستِ رُوات» writes it (shown when present). */
+  arabic_name?: string | null;
   aliases: string[];
   death_note: string | null;
   death_year: number | null;
   century: number | null;
+  /** The opening of the study the website shows (from his latest volume), for cards. */
+  excerpt?: string | null;
 }
 
 /** The website's book, chapter and narrator registries (data/registry-<sha>.json). */

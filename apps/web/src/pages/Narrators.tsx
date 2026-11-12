@@ -1,31 +1,41 @@
-// «رواۃ»: the narrators whose study is in the research, as on the website's
-// /narrators pages. Nothing here is downloaded: the list is the narrator
-// registry and each study is a range of sections of a narration already on
-// the device.
+// «روات حدیث»: the narrators whose study is in the research, as on the
+// website's /narrators pages. Nothing here is downloaded: the list is the
+// narrator registry and each study is a range of sections of a narration
+// already on the device. Since 9 Nov 2026 the website shows names in Arabic
+// (sorted as the book's «فہرستِ رُوات»), and a narrator's page shows the
+// study from his latest volume, laid out like a narration, with his other
+// studies listed under it.
 import { useEffect, useMemo, useState } from 'react';
 
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 
 import {
   getNarrator,
+  type HadithRow,
+  latestFirst,
   listNarrators,
-  narratorStudies,
-  narratorTotals,
+  type Narrator,
   type NarratorListItem,
+  narratorStudies,
   normalize,
   parseSections,
+  stripHtml,
 } from '@tehqeqat/core';
 
-import { hadithPath, narratorPath } from '../components/HadithCard';
+import { bookPath, hadithPath, narratorPath } from '../components/HadithCard';
 import { Html } from '../components/Html';
 import { Icon } from '../components/Icon';
-import { PageTitle } from '../components/Shell';
+import { Contents, type ReaderAction, ReaderToolbar, ResearchSections, SectionTitle, useSections } from '../components/Reader';
 import { db } from '../db/client';
+import type { ExportMeta } from '../export';
 import { useQuery } from '../hooks';
-import { t } from '../strings';
+import { fmt, t } from '../strings';
+import { NarratorName } from './Hadith';
 
 const SHOWN = 60;
 const SUGGESTED = 6;
+
+type Sort = 'name' | 'death' | 'studies';
 
 function shuffled<T>(items: T[], count: number): T[] {
   const copy = [...items];
@@ -36,32 +46,46 @@ function shuffled<T>(items: T[], count: number): T[] {
   return copy.slice(0, count);
 }
 
+const sorters: Record<Sort, (a: NarratorListItem, b: NarratorListItem) => number> = {
+  // The list already comes in the order of the Arabic names.
+  name: () => 0,
+  death: (a, b) => (a.death_year ?? Infinity) - (b.death_year ?? Infinity),
+  studies: (a, b) => b.study_count - a.study_count,
+};
+
 function NarratorCard({ n }: { n: NarratorListItem }) {
   return (
     <Link to={narratorPath(n.slug)} className="card narrator-card">
-      <span className="narrator-card__name urdu">{n.name}</span>
-      {n.death_note && <span className="muted small">{t.narrators.died(n.death_note)}</span>}
-      <span className="muted small">{t.narrators.inNarrations(n.hadith_count)}</span>
+      <span className="narrator-card__name">
+        <NarratorName n={n} />
+      </span>
+      {n.death_note && <span className="death-pill">{n.death_note}</span>}
+      {n.excerpt && <span className="narrator-card__excerpt urdu">{n.excerpt}</span>}
+      <span className="narrator-card__foot">
+        <span>{n.hadith_count === 1 ? 'ایک روایت میں تذکرہ' : t.narrators.inNarrations(n.hadith_count)}</span>
+        <span className="link-strong">{t.narrators.read} ←</span>
+      </span>
     </Link>
   );
 }
 
 export function NarratorsPage() {
   const all = useQuery(() => listNarrators(db), []);
-  const totals = useQuery(() => narratorTotals(db), []);
   const [query, setQuery] = useState('');
   const [period, setPeriod] = useState<number | 'unknown' | null>(null);
+  const [sort, setSort] = useState<Sort>('name');
   const [shown, setShown] = useState(SHOWN);
   const [round, setRound] = useState(0);
   useEffect(() => {
     document.title = `${t.narrators.title} | ${t.appName}`;
   }, []);
-  useEffect(() => setShown(SHOWN), [query, period]);
+  useEffect(() => setShown(SHOWN), [query, period, sort]);
 
   const narrators = all.data ?? [];
-  // Names are matched without harakat and with the Arabic/Urdu letter forms folded.
+  // Names only (Arabic, Urdu and other spellings), without harakat and with
+  // the Arabic/Urdu letter forms folded: «أبان» and «ابان» both find him.
   const keys = useMemo(
-    () => new Map(narrators.map((n) => [n.slug, normalize([n.name, ...n.aliases].join(' '))])),
+    () => new Map(narrators.map((n) => [n.slug, normalize([n.arabic_name ?? '', n.name, ...n.aliases].join(' '))])),
     [narrators],
   );
   const centuries = useMemo(
@@ -69,18 +93,22 @@ export function NarratorsPage() {
     [narrators],
   );
   const needle = normalize(query);
-  const filtered = narrators.filter(
-    (n) =>
-      (!needle || keys.get(n.slug)?.includes(needle)) &&
-      (period === null || (period === 'unknown' ? n.century == null : n.century === period)),
-  );
+  const filtered = narrators
+    .filter(
+      (n) =>
+        (!needle || keys.get(n.slug)?.includes(needle)) &&
+        (period === null || (period === 'unknown' ? n.century == null : n.century === period)),
+    )
+    .sort(sorters[sort]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const suggestions = useMemo(() => shuffled(narrators, SUGGESTED), [narrators, round]);
 
   if (all.data && narrators.length === 0) {
     return (
       <div className="page">
-        <PageTitle title={t.narrators.title} />
+        <header className="page-title page-title--plain">
+          <h1>{t.narrators.title}</h1>
+        </header>
         <p className="empty">{t.narrators.empty}</p>
       </div>
     );
@@ -88,21 +116,72 @@ export function NarratorsPage() {
 
   return (
     <div className="page narrators">
-      <header className="page-title">
-        <p className="eyebrow">{t.narrators.eyebrow}</p>
+      <header className="page-title page-title--plain">
         <h1>{t.narrators.title}</h1>
         <p>{t.narrators.description}</p>
-        {narrators.length > 0 && totals.data && (
-          <p className="muted small">{t.narrators.stats(narrators.length, totals.data.studies, totals.data.hadith)}</p>
-        )}
       </header>
+
+      <div className="searchbox searchbox--small">
+        <span className="searchbox__icon" aria-hidden="true">
+          <Icon name="search" />
+        </span>
+        <label htmlFor="nq" className="sr-only">
+          {t.narrators.searchLabel}
+        </label>
+        <input
+          id="nq"
+          type="search"
+          autoComplete="off"
+          placeholder={t.narrators.searchPlaceholder}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+
+      {centuries.length > 0 && (
+        <div className="chips chips--scroll" role="group" aria-label={t.narrators.period}>
+          <button type="button" className="chip chip--link" aria-pressed={period === null} onClick={() => setPeriod(null)}>
+            {t.narrators.periodAll}
+          </button>
+          {centuries.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className="chip chip--link"
+              aria-pressed={period === c}
+              onClick={() => setPeriod(c)}
+            >
+              {t.narrators.century(c)}
+            </button>
+          ))}
+          {narrators.some((n) => n.century == null) && (
+            <button
+              type="button"
+              className="chip chip--link"
+              aria-pressed={period === 'unknown'}
+              onClick={() => setPeriod('unknown')}
+            >
+              {t.narrators.unknown}
+            </button>
+          )}
+        </div>
+      )}
+      <label className="sort">
+        <span>{t.narrators.sort}</span>
+        <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+          <option value="name">{t.narrators.sortName}</option>
+          <option value="death">{t.narrators.sortDeath}</option>
+          <option value="studies">{t.narrators.sortStudies}</option>
+        </select>
+      </label>
 
       {suggestions.length > 0 && !needle && period === null && (
         <section className="section">
+          <h2 className="section-title">{t.narrators.suggestions}</h2>
           <div className="section__head">
-            <h2>{t.narrators.suggestions}</h2>
+            <p className="muted small">{t.narrators.suggestionsNote}</p>
             <button type="button" className="btn btn--small" onClick={() => setRound((r) => r + 1)}>
-              <Icon name="refresh" />
+              <Icon name="shuffle" />
               {t.narrators.more}
             </button>
           </div>
@@ -117,48 +196,7 @@ export function NarratorsPage() {
       )}
 
       <section className="section">
-        <h2>{t.narrators.all}</h2>
-        <div className="searchbox searchbox--small">
-          <label htmlFor="nq" className="sr-only">
-            {t.narrators.searchLabel}
-          </label>
-          <input
-            id="nq"
-            type="search"
-            autoComplete="off"
-            placeholder={t.narrators.searchPlaceholder}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        {centuries.length > 0 && (
-          <div className="chips" role="group" aria-label={t.narrators.period}>
-            <button type="button" className="chip chip--link" aria-pressed={period === null} onClick={() => setPeriod(null)}>
-              {t.narrators.periodAll}
-            </button>
-            {centuries.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className="chip chip--link"
-                aria-pressed={period === c}
-                onClick={() => setPeriod(c)}
-              >
-                {t.narrators.century(c)}
-              </button>
-            ))}
-            {narrators.some((n) => n.century == null) && (
-              <button
-                type="button"
-                className="chip chip--link"
-                aria-pressed={period === 'unknown'}
-                onClick={() => setPeriod('unknown')}
-              >
-                {t.narrators.unknown}
-              </button>
-            )}
-          </div>
-        )}
+        <h2 className="section-title">{t.narrators.all}</h2>
         <p className="result-count" aria-live="polite">
           {filtered.length === narrators.length
             ? t.narrators.count(narrators.length)
@@ -182,66 +220,211 @@ export function NarratorsPage() {
   );
 }
 
+const MARKER = /\[\s*([\d۰-۹٠-٩]+)\s*\]/g;
+
+/**
+ * The footnotes a study cites, as the website picks them: a narration keeps
+ * all its footnotes in one list, one paragraph each opening with its marker
+ * («[13] …»); a narrator's study cites only some of them.
+ */
+function citedReferences(referencesHtml: string | null, sectionHtml: string[]): string {
+  if (!referencesHtml) return '';
+  const cited = new Set<string>();
+  for (const html of sectionHtml) {
+    for (const m of stripHtml(html).matchAll(MARKER)) cited.add(normalize(m[1]!));
+  }
+  if (cited.size === 0) return '';
+  const paragraphs = referencesHtml.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) ?? [];
+  return paragraphs
+    .filter((p) => {
+      const first = MARKER.exec(stripHtml(p));
+      MARKER.lastIndex = 0;
+      return first ? cited.has(normalize(first[1]!)) : false;
+    })
+    .join('');
+}
+
+const studyLength = (s: { hadith: { html_content: string }; start: number; end: number }) =>
+  parseSections(s.hadith.html_content)
+    .slice(s.start, s.end + 1)
+    .reduce((n, sec) => n + stripHtml(sec.heading).length + stripHtml(sec.content).length, 0);
+
 export function NarratorPage() {
   const slug = decodeURIComponent(useParams().slug ?? '');
+  const { hash } = useLocation();
   const narrator = useQuery(() => getNarrator(db, slug), [slug]);
-  const studies = useQuery(() => narratorStudies(db, slug), [slug]);
   const n = narrator.data;
+  const studies = useQuery(() => (n ? narratorStudies(db, n.slug) : Promise.resolve([])), [n?.slug]);
+  const ordered = useMemo(() => latestFirst(studies.data ?? [], studyLength), [studies.data]);
+  const shown = ordered[0];
+  const sections = useMemo(
+    () => (shown ? parseSections(shown.hadith.html_content).slice(shown.start, shown.end + 1) : []),
+    [shown],
+  );
+  const references = useMemo(
+    () =>
+      shown
+        ? citedReferences(
+            shown.hadith.references_html,
+            sections.map((s) => `${s.heading ?? ''} ${s.content ?? ''}`),
+          )
+        : '',
+    [shown, sections],
+  );
+  const state = useSections(sections, '', hash, shown?.start ?? 0);
+  const [toast, setToast] = useState('');
   useEffect(() => {
-    if (n) document.title = `${n.name} | ${t.appName}`;
+    if (n) document.title = `${n.arabic_name || n.name} | ${t.appName}`;
   }, [n]);
+
   if (narrator.loading && !n) return null;
   if (!n) return <p className="empty page">{t.narrators.notFound}</p>;
-  const list = studies.data ?? [];
+  const say = (message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(''), 2500);
+  };
+
+  const exportArgs = (who: Narrator): [HadithRow, ExportMeta] => {
+    const row = {
+      ...shown!.hadith,
+      hukm_html: null,
+      html_content: JSON.stringify(sections),
+      references_html: references || null,
+    } as unknown as HadithRow;
+    return [
+      row,
+      {
+        title: who.arabic_name || who.name,
+        meta: [
+          who.arabic_name ? who.name : '',
+          who.death_note ?? '',
+          `${t.hadith.book}: ${shown!.hadith.book}`,
+          t.hadith.reviewedBy,
+        ],
+        url: `https://tehqeqatehadees.com/narrators/${encodeURIComponent(who.slug)}`,
+        labels: { references: t.hadith.references, source: t.hadith.source, creator: t.appName },
+      },
+    ];
+  };
+  const actions: ReaderAction[] = shown
+    ? [
+        {
+          icon: 'copy',
+          label: t.hadith.copyText,
+          onClick: async () => {
+            try {
+              const { copyHadith } = await import('../export');
+              await copyHadith(...exportArgs(n));
+              say(t.hadith.textCopied);
+            } catch {
+              say(t.hadith.copyFailed);
+            }
+          },
+        },
+        {
+          icon: 'file',
+          label: t.hadith.word,
+          onClick: async () => {
+            try {
+              const { downloadWord } = await import('../export');
+              downloadWord(...exportArgs(n));
+              say(t.hadith.wordReady);
+            } catch {
+              say(t.hadith.wordFailed);
+            }
+          },
+        },
+        { icon: 'print', label: t.hadith.print, onClick: () => window.print() },
+      ]
+    : [];
+
   return (
     <article className="page reader narrator">
-      <nav className="crumbs">
-        <Link to="/narrators">{t.narrators.title}</Link>
-      </nav>
-      <p className="eyebrow">{t.narrators.detailEyebrow}</p>
-      <h1 className="reader__title urdu">{n.name}</h1>
-      {n.death_note && <p className="muted">{t.narrators.died(n.death_note)}</p>}
-      {n.aliases.length > 0 && (
-        <p className="muted small">
-          {t.narrators.alsoKnown}: {n.aliases.join('، ')}
-        </p>
+      <div className="reader-head card">
+        <nav className="crumbs" aria-label="breadcrumb">
+          <Link to="/">{t.hadith.home}</Link>
+          <Link to="/narrators">{t.narrators.title}</Link>
+        </nav>
+        <header className="reader-head__title">
+          {shown && (
+            <Link to={bookPath(shown.hadith.book)} className="book-pill">
+              <Icon name="book-open" />
+              <span>{shown.hadith.book}</span>
+            </Link>
+          )}
+          <h1 className="reader__title narrator__title">
+            <NarratorName n={n} />
+          </h1>
+          {n.arabic_name && (
+            <p className="narrator__urdu urdu">
+              <span className="sr-only">{t.narrators.urduName}: </span>
+              {n.name}
+            </p>
+          )}
+          <p className="reader__by">
+            {n.death_note && <span>{n.death_note}</span>}
+            <span>{t.hadith.reviewedBy}</span>
+          </p>
+          {n.aliases.length > 0 && (
+            <p className="muted small">
+              {t.narrators.alsoKnown}: {n.aliases.join('، ')}
+            </p>
+          )}
+        </header>
+        {shown && <ReaderToolbar state={state} actions={actions} toast={toast} />}
+      </div>
+
+      {shown && (
+        <>
+          <SectionTitle>{t.narrators.studiesHeading}</SectionTitle>
+          <p className="muted">{t.narrators.intro(n.arabic_name || n.name)}</p>
+          <Contents state={state} />
+          <ResearchSections sections={sections} state={state} />
+          {references && (
+            <section className="refs">
+              <SectionTitle>{t.hadith.references}</SectionTitle>
+              <Html html={references} className="urdu prose prose--small card" />
+            </section>
+          )}
+          <div className="study-source card">
+            <p className="muted small">{t.narrators.fromNarration}</p>
+            <Link to={hadithPath(shown.hadith.slug)} className="study__title">
+              <Html html={shown.hadith.title_html} className="urdu" />
+            </Link>
+            <Link to={`${hadithPath(shown.hadith.slug)}#s-${shown.start}`} className="link-strong">
+              {t.narrators.openNarration} ←
+            </Link>
+          </div>
+        </>
       )}
 
-      <h2 className="reader__h2">{t.narrators.studiesHeading}</h2>
-      <p className="muted">{t.narrators.intro(n.name)}</p>
-      <ol className="studies">
-        {list.map((s, i) => {
-          const sections = parseSections(s.hadith.html_content).slice(s.start, s.end + 1);
-          return (
-            <li key={`${s.hadith.id}-${s.start}`} className="card study">
-              <p className="eyebrow">
-                {t.narrators.fromNarration}
-                {list.length > 1 && <span className="muted"> · {t.narrators.studyOf(i + 1, list.length)}</span>}
-              </p>
-              <Link to={hadithPath(s.hadith.slug)} className="study__title">
-                <Html html={s.hadith.title_html} className="urdu" />
-              </Link>
-              <div className="study__body">
-                {sections.map((sec, j) => (
-                  <div key={j}>
-                    {sec.heading?.trim() && <Html as="h3" html={sec.heading} className="urdu study__heading" />}
-                    {sec.content?.trim() && <Html html={sec.content} className="urdu prose" />}
-                  </div>
-                ))}
-              </div>
-              <Link to={`${hadithPath(s.hadith.slug)}#s-${s.start}`} className="link-strong">
-                {t.narrators.openNarration} ←
-              </Link>
-            </li>
-          );
-        })}
-      </ol>
+      {ordered.length > 1 && (
+        <section className="section">
+          <SectionTitle>{t.narrators.otherStudies}</SectionTitle>
+          <p className="muted small">{t.narrators.otherStudiesNote}</p>
+          <ul className="related">
+            {ordered.slice(1).map((s) => (
+              <li key={`${s.hadith.id}-${s.start}`}>
+                <Link to={`${hadithPath(s.hadith.slug)}#s-${s.start}`}>
+                  <Html as="span" html={s.hadith.title_html} className="urdu" />
+                  <span className="related__book">{s.hadith.book}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <p className="muted small">{t.narrators.note}</p>
       <p>
         <Link to="/narrators" className="link-strong">
           {t.narrators.all} ←
         </Link>
       </p>
+      {ordered.length > 0 && (
+        <p className="muted small">
+          {t.narrators.inNarrations(new Set(ordered.map((s) => s.hadith.id)).size)} · {fmt(ordered.length)} تراجم
+        </p>
+      )}
     </article>
   );
 }

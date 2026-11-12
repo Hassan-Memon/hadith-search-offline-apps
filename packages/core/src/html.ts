@@ -33,7 +33,11 @@ export function decodeEntities(text: string): string {
   });
 }
 
-/** Tags → spaces, entities decoded, whitespace collapsed. */
+/**
+ * Plain text: the end of a paragraph, line or cell is a space, an inline tag
+ * is nothing (Word splits a word across spans, «رہ</span><span>ے», and the
+ * browser shows no space there either), entities decoded, whitespace collapsed.
+ */
 export function stripHtml(html: string | null | undefined): string {
   if (!html) return '';
   return decodeEntities(
@@ -41,7 +45,8 @@ export function stripHtml(html: string | null | undefined): string {
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
       .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/<[^>]+>/g, ' '),
+      .replace(/<(?:br\s*\/?|\/(?:p|div|li|h[1-6]|tr|td|th))>/gi, ' ')
+      .replace(/<[^>]+>/g, ''),
   )
     .replace(/\s+/g, ' ')
     .trim();

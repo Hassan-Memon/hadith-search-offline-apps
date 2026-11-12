@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
@@ -10,6 +10,26 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 // "/" for app.tehqeqatehadees.com; the deploy workflow passes "/<repo>/" while
 // the site is served from <user>.github.io/<repo>/.
 const base = process.env.BASE_PATH || '/';
+
+/**
+ * The dev server marks a .gz file as gzip-encoded, so the browser unpacks the
+ * snapshot before the app checks its sha256 and the first download fails.
+ * GitHub Pages sends it as it is; so does this, for data/*.gz in development.
+ */
+function rawSnapshots(): Plugin {
+  const dir = fileURLToPath(new URL('./public/data/', import.meta.url));
+  return {
+    name: 'raw-snapshots',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const name = /\/data\/([\w.-]+\.gz)(?:\?|$)/.exec(req.url ?? '')?.[1];
+        if (!name || !existsSync(dir + name)) return next();
+        res.setHeader('Content-Type', 'application/gzip');
+        createReadStream(dir + name).pipe(res);
+      });
+    },
+  };
+}
 
 export default defineConfig({
   base,
@@ -23,6 +43,7 @@ export default defineConfig({
   server: { port: 5173 },
   build: { target: 'es2022' },
   plugins: [
+    rawSnapshots(),
     react(),
     VitePWA({
       // 'prompt': a new version waits instead of reloading the page under the
@@ -40,8 +61,8 @@ export default defineConfig({
         scope: base,
         display: 'standalone',
         orientation: 'any',
-        theme_color: '#1f2a30',
-        background_color: '#f3f6f7',
+        theme_color: '#25272b',
+        background_color: '#fafaf9',
         categories: ['books', 'education', 'reference'],
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -54,7 +75,7 @@ export default defineConfig({
         // cached on install. Jameel Noori (5 MB) is cached the first time the
         // reader picks it. Hadith data never goes through here: it lives in
         // SQLite and is updated by the sync engine.
-        globPatterns: ['**/*.{js,css,html,svg,png,jpg,ico,woff2,wasm}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg,webp,ico,woff2,wasm}'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         // Data files are fetched by the sync engine, never precached or rewritten.
         globIgnores: ['**/Jameel_*', 'data/**'],

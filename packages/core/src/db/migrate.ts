@@ -7,14 +7,32 @@ import { SCHEMA_SQL, SCHEMA_VERSION } from './schema.generated.js';
  * `IF NOT EXISTS`, so running it is always safe. Version-specific migrations
  * go in MIGRATIONS keyed by the version they upgrade *from*.
  */
-const MIGRATIONS: Record<number, string[]> = {
+const MIGRATIONS: Record<number, (string | ((db: DbAdapter) => Promise<void>))[]> = {
   // 1 → 2: chapters, narrators and the book registry (the new tables come
   // from schema.sql; only the new hadith columns need ALTER).
   1: [
     'ALTER TABLE hadith ADD COLUMN chapter TEXT',
     "ALTER TABLE hadith ADD COLUMN narrators_json TEXT NOT NULL DEFAULT '[]'",
   ],
+  // 2 → 3: narrators' Arabic names and card excerpts. Only the registry
+  // fills them, so a device keeps its data and fetches the registry again.
+  // Forgetting the registry's checksum makes the next sync download it.
+  // (A version 1 file has no narrators table yet: schema.sql creates it whole.)
+  2: [
+    async (db) => {
+      if (!(await hasTable(db, 'narrators'))) return;
+      await db.exec('ALTER TABLE narrators ADD COLUMN arabic_name TEXT');
+      await db.exec('ALTER TABLE narrators ADD COLUMN excerpt TEXT');
+    },
+    async (db) => {
+      if (await hasTable(db, 'settings')) await db.exec("DELETE FROM settings WHERE key = 'registry_sha256'");
+    },
+  ],
 };
+
+async function hasTable(db: DbAdapter, name: string): Promise<boolean> {
+  return Boolean(await db.get("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", [name]));
+}
 
 export async function ensureSchema(db: DbAdapter): Promise<{ from: number; to: number }> {
   const row = await db.get<{ user_version: number }>('PRAGMA user_version');
@@ -23,8 +41,9 @@ export async function ensureSchema(db: DbAdapter): Promise<{ from: number; to: n
   // (A fresh file, version 0, gets everything from schema.sql.)
   if (from > 0) {
     for (let v = from; v < SCHEMA_VERSION; v++) {
-      for (const statement of MIGRATIONS[v] ?? []) {
-        await db.exec(statement);
+      for (const step of MIGRATIONS[v] ?? []) {
+        if (typeof step === 'string') await db.exec(step);
+        else await step(db);
       }
     }
   }

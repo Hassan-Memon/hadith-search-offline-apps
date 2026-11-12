@@ -257,10 +257,12 @@ export async function relatedHadith(
 interface NarratorDbRow {
   slug: string;
   name: string;
+  arabic_name: string | null;
   aliases_json: string;
   death_note: string | null;
   death_year: number | null;
   century: number | null;
+  excerpt: string | null;
 }
 
 function jsonList(value: string | null | undefined): string[] {
@@ -275,34 +277,45 @@ function jsonList(value: string | null | undefined): string[] {
 const toNarrator = (r: NarratorDbRow): Narrator => ({
   slug: r.slug,
   name: r.name,
+  arabic_name: r.arabic_name ?? null,
   aliases: jsonList(r.aliases_json),
   death_note: r.death_note,
   death_year: r.death_year,
   century: r.century,
+  excerpt: r.excerpt ?? null,
 });
+
+/**
+ * The key a narrator is sorted under, as the website sorts: his Arabic name
+ * (his Urdu name until he has one) without diacritics, spaces or punctuation,
+ * with the Arabic and Urdu forms of a letter made the same.
+ */
+export const narratorSortKey = (n: Pick<Narrator, 'name' | 'arabic_name'>): string =>
+  normalize(n.arabic_name || n.name).replace(/[^\p{L}\p{N}]/gu, '');
 
 export interface NarratorListItem extends Narrator {
   study_count: number;
   hadith_count: number;
 }
 
-/** Every narrator, with how many studies and narrations on this device are about him. */
+/** Every narrator with a study on this device, in the order of the book's «فہرستِ رُوات». */
 export async function listNarrators(db: DbAdapter): Promise<NarratorListItem[]> {
   const counts = await db.all<{ slug: string; studies: number; hadith: number }>(
     `SELECT json_extract(j.value, '$.slug') AS slug, count(*) AS studies, count(DISTINCT h.id) AS hadith
      FROM hadith h, json_each(h.narrators_json) j WHERE h.narrators_json <> '[]' GROUP BY 1`,
   );
   const bySlug = new Map(counts.map((c) => [c.slug, c]));
-  const rows = await db.all<NarratorDbRow>(
-    'SELECT * FROM narrators ORDER BY death_year IS NULL, death_year, name',
-  );
+  const rows = await db.all<NarratorDbRow>('SELECT * FROM narrators');
   return rows
     .map((r) => ({
       ...toNarrator(r),
       study_count: Number(bySlug.get(r.slug)?.studies ?? 0),
       hadith_count: Number(bySlug.get(r.slug)?.hadith ?? 0),
     }))
-    .filter((n) => n.study_count > 0);
+    .filter((n) => n.study_count > 0)
+    .map((n) => ({ n, key: narratorSortKey(n) }))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map(({ n }) => n);
 }
 
 /** How many studies there are and in how many narrations (each counted once). */
@@ -315,36 +328,99 @@ export async function narratorTotals(db: DbAdapter): Promise<{ studies: number; 
   return { studies: Number(row?.studies ?? 0), hadith: Number(row?.hadith ?? 0) };
 }
 
+/**
+ * One narrator. Spellings the website merged into one narrator (they share an
+ * Arabic name) keep their old addresses: a slug that is no longer a narrator
+ * finds the narrator who has it as another spelling.
+ */
 export async function getNarrator(db: DbAdapter, slug: string): Promise<Narrator | undefined> {
   const row = await db.get<NarratorDbRow>('SELECT * FROM narrators WHERE slug = ?', [slug]);
-  return row ? toNarrator(row) : undefined;
+  if (row) return toNarrator(row);
+  const wanted = normalize(slug.replace(/-/g, ' ')).replace(/\s+/g, '');
+  if (!wanted) return undefined;
+  const rows = await db.all<NarratorDbRow>("SELECT * FROM narrators WHERE aliases_json <> '[]'");
+  const old = rows.find((r) => jsonList(r.aliases_json).some((a) => normalize(a).replace(/\s+/g, '') === wanted));
+  return old ? toNarrator(old) : undefined;
 }
 
+/** A book's place among the books, higher being later (see `latestFirst`). */
+export type BookRank = [number, number, string];
+
 export interface NarratorStudy {
-  hadith: HadithListItem & { html_content: string };
+  hadith: HadithListItem & { html_content: string; references_html: string | null };
   /** Sections start…end (inclusive) of the narration are the study. */
   start: number;
   end: number;
+  rank: BookRank;
 }
 
-/** Where one narrator is studied: which sections of which narrations. */
+/**
+ * A book's rank as the website ranks it: the volumes of the series come after
+ * the other books whatever their dates, in volume order; the other books go
+ * by publication date. A book the registry does not know comes first.
+ */
+function bookRank(b: { is_series: number | null; volume_no: number | null; published_at: string | null }): BookRank {
+  if (b.is_series == null) return [-1, 0, ''];
+  if (b.is_series && b.volume_no) return [1, b.volume_no, ''];
+  return [0, 0, b.published_at ?? ''];
+}
+
+const compareRank = (a: BookRank, b: BookRank) =>
+  a[0] - b[0] || a[1] - b[1] || (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0);
+
+/**
+ * A narrator's studies, the one the website shows first: the latest volume,
+ * and within one volume the fullest study. `chars` gives a study's length
+ * (the caller parses the sections anyway).
+ */
+export function latestFirst<T extends { rank: BookRank }>(studies: T[], chars: (s: T) => number): T[] {
+  return studies
+    .map((s) => ({ s, c: chars(s) }))
+    .sort((a, b) => compareRank(b.s.rank, a.s.rank) || b.c - a.c)
+    .map(({ s }) => s);
+}
+
+/** Every study of one narrator: which sections of which narrations, with each narration's book rank. */
 export async function narratorStudies(db: DbAdapter, slug: string): Promise<NarratorStudy[]> {
-  const rows = await db.all<HadithListItem & { html_content: string; s: number; e: number }>(
-    `SELECT ${prefixed('h')}, h.html_content,
-       json_extract(j.value, '$.start') AS s, json_extract(j.value, '$.end') AS e
-     FROM hadith h, json_each(h.narrators_json) j
+  const rows = await db.all<
+    HadithListItem & {
+      html_content: string;
+      references_html: string | null;
+      s: number;
+      e: number;
+      is_series: number | null;
+      volume_no: number | null;
+      published_at: string | null;
+    }
+  >(
+    `SELECT ${prefixed('h')}, h.html_content, h.references_html,
+       json_extract(j.value, '$.start') AS s, json_extract(j.value, '$.end') AS e,
+       b.is_series, b.volume_no, b.published_at
+     FROM hadith h
+     JOIN json_each(h.narrators_json) j
+     LEFT JOIN book_spelling bs ON bs.spelling = h.book
+     LEFT JOIN books b ON b.name = bs.name
      WHERE h.narrators_json <> '[]' AND json_extract(j.value, '$.slug') = ?
      ORDER BY h.rowid, s`,
     [slug],
   );
-  return rows.map(({ s, e, ...hadith }) => ({ hadith, start: Number(s), end: Number(e) }));
+  const seen = new Set<string>();
+  const out: NarratorStudy[] = [];
+  for (const { s, e, is_series, volume_no, published_at, ...hadith } of rows) {
+    // Keep one row per study whatever the joins found.
+    const key = `${hadith.id}:${s}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ hadith, start: Number(s), end: Number(e), rank: bookRank({ is_series, volume_no, published_at }) });
+  }
+  return out;
 }
 
 /** The narrators studied in one narration, with their names, in the order of the text. */
 export async function hadithNarrators(
   db: DbAdapter,
   narratorsJson: string | null | undefined,
-): Promise<(NarratorRef & { name: string })[]> {
+): Promise<(NarratorRef & { name: string; arabic_name: string | null })[]> {
   let refs: NarratorRef[];
   try {
     refs = narratorRefs(JSON.parse(narratorsJson ?? '[]'));
@@ -352,12 +428,14 @@ export async function hadithNarrators(
     return [];
   }
   if (refs.length === 0) return [];
-  const names = await db.all<{ slug: string; name: string }>(
-    `SELECT slug, name FROM narrators WHERE slug IN (${refs.map(() => '?').join(', ')})`,
+  const names = await db.all<{ slug: string; name: string; arabic_name: string | null }>(
+    `SELECT slug, name, arabic_name FROM narrators WHERE slug IN (${refs.map(() => '?').join(', ')})`,
     refs.map((r) => r.slug),
   );
-  const bySlug = new Map(names.map((n) => [n.slug, n.name]));
-  return refs.filter((r) => bySlug.has(r.slug)).map((r) => ({ ...r, name: bySlug.get(r.slug)! }));
+  const bySlug = new Map(names.map((n) => [n.slug, n]));
+  return refs
+    .filter((r) => bySlug.has(r.slug))
+    .map((r) => ({ ...r, name: bySlug.get(r.slug)!.name, arabic_name: bySlug.get(r.slug)!.arabic_name ?? null }));
 }
 
 // ---- registries --------------------------------------------------------------
@@ -393,9 +471,18 @@ export async function replaceRegistry(db: DbAdapter, registry: Registry): Promis
   await db.run('DELETE FROM narrators');
   for (const n of registry.narrators ?? []) {
     await db.run(
-      `INSERT OR REPLACE INTO narrators (slug, name, aliases_json, death_note, death_year, century)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [n.slug, n.name, JSON.stringify(n.aliases ?? []), n.death_note || null, n.death_year ?? null, n.century ?? null],
+      `INSERT OR REPLACE INTO narrators (slug, name, aliases_json, death_note, death_year, century, arabic_name, excerpt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        n.slug,
+        n.name,
+        JSON.stringify(n.aliases ?? []),
+        n.death_note || null,
+        n.death_year ?? null,
+        n.century ?? null,
+        n.arabic_name || null,
+        n.excerpt || null,
+      ],
     );
   }
 }
