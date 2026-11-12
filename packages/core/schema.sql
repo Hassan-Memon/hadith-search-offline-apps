@@ -3,7 +3,7 @@
 -- Bump PRAGMA user_version and add a migration in src/db/migrate.ts whenever
 -- this file changes.
 
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 
 -- One row per hadith document, fields exactly as the API returns them.
 CREATE TABLE IF NOT EXISTS hadith (
@@ -68,11 +68,13 @@ CREATE TABLE IF NOT EXISTS chapters (
 
 CREATE TABLE IF NOT EXISTS narrators (
   slug         TEXT PRIMARY KEY,
-  name         TEXT NOT NULL,
+  name         TEXT NOT NULL,                -- Urdu name
   aliases_json TEXT NOT NULL DEFAULT '[]',
   death_note   TEXT,                         -- as printed, e.g. «المتوفی ۲۹۰ھ»
   death_year   INTEGER,
-  century      INTEGER
+  century      INTEGER,
+  arabic_name  TEXT,                         -- schema 3: as the book's «فہرستِ رُوات» writes it
+  excerpt      TEXT                          -- schema 3: opening of the study the website shows
 );
 
 -- Announcements and the PDF library, as the website lists them

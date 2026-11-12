@@ -114,8 +114,10 @@ export function hadithPlainText(
         return spelled ? ` ${spelled} ` : ' ';
       })
       .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n')
-      .replace(/<[^>]+>/g, ' '),
+      .replace(/<\/(?:p|div|li|h[1-6]|tr)>/gi, '\n')
+      // Word splits a word across spans («رہ</span><span>ے»), so an inline
+      // tag is nothing, not a space: the browser shows none either.
+      .replace(/<[^>]+>/g, ''),
   )
     .replace(/[ \t\u00a0]+/g, ' ')
     .replace(/ *\n */g, '\n')

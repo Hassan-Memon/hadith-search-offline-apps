@@ -12,6 +12,7 @@ import {
   countHadith,
   getBook,
   getHadithBySlug,
+  getNarrator,
   hadithNarrators,
   listBooks,
   listChapters,
@@ -25,6 +26,7 @@ import { sync, type SnapshotInstaller } from '../src/sync/engine.js';
 import { createStaticApi, type StaticManifest } from '../src/sync/static.js';
 import { slimHtml } from '../src/slim.js';
 import { getSetting } from '../src/db/repo.js';
+import { SCHEMA_VERSION } from '../src/db/migrate.js';
 
 const SITE = 'https://site.test';
 const PUB = 'https://pub.test/data/';
@@ -481,6 +483,8 @@ test('chapters, the book registry and narrators reach devices; a باب move nee
         {
           slug: 'زید',
           name: 'زید بن فلاں',
+          arabic_name: 'زَيْدُ بْنُ فُلَانٍ',
+          excerpt: 'زید پر ائمہ کا کلام',
           death_note: 'المتوفی ۲۰۰ھ',
           death_year: 200,
           century: 2,
@@ -554,13 +558,15 @@ test('chapters, the book registry and narrators reach devices; a باب move nee
     );
     const row0 = await getHadithBySlug(device, 'slug-0');
     assert.deepEqual(await hadithNarrators(device, row0?.narrators_json), [
-      { slug: 'زید', start: 1, end: 1, name: 'زید بن فلاں' },
+      { slug: 'زید', start: 1, end: 1, name: 'زید بن فلاں', arabic_name: 'زَيْدُ بْنُ فُلَانٍ' },
     ]);
     const narrators = await listNarrators(device);
     assert.deepEqual(
-      narrators.map((n) => [n.name, n.study_count, n.hadith_count, n.death_year]),
-      [['زید بن فلاں', 2, 2, 200]],
+      narrators.map((n) => [n.name, n.arabic_name, n.excerpt, n.study_count, n.hadith_count, n.death_year]),
+      [['زید بن فلاں', 'زَيْدُ بْنُ فُلَانٍ', 'زید پر ائمہ کا کلام', 2, 2, 200]],
     );
+    // A spelling the website merged into this narrator still finds him.
+    registries.narrators![0]!.aliases = ['زید ابن فلاں'];
     const samples = await chapterSamples(device, 7);
     assert.equal(samples.length, 2);
     assert.deepEqual(samples, await chapterSamples(device, 7));
@@ -599,10 +605,25 @@ test('chapters, the book registry and narrators reach devices; a باب move nee
       [['slug-2', 1, 2]],
     );
 
+    // The alias given in step 3's registry: the old address of a merged spelling.
+    assert.equal((await getNarrator(device, 'زید-ابن-فلاں'))?.slug, 'زید');
+    assert.equal(await getNarrator(device, 'کوئی-اور'), undefined);
+
     // 4. Nothing changed: the registry is not downloaded again.
     site.calls.length = 0;
     await sync({ db: device, api, site: api, installer, appVersion: '1.2.0' });
     assert.equal(site.calls.filter((u) => u.includes('/registry-')).length, 0);
+
+    // 5. A build published with schema 2 is upgraded in place: same epoch,
+    //    no new change file, so devices keep their data.
+    const m3Path = join(root, 'o3', 'manifest.json');
+    const m3 = JSON.parse(await readFile(m3Path, 'utf8')) as StaticManifest;
+    await writeFile(m3Path, JSON.stringify({ ...m3, schema_version: 2, snapshot: { ...m3.snapshot!, schema_version: 2 } }));
+    const r5 = await buildData({ site: SITE, prevBase: PUB, outDir: join(root, 'o5'), fetch: f, retryDelayMs: 1 });
+    assert.equal(r5.fullBuild, false);
+    const m5 = JSON.parse(await readFile(join(root, 'o5', 'manifest.json'), 'utf8')) as StaticManifest;
+    assert.equal(m5.epoch, m3.epoch);
+    assert.equal(m5.schema_version, SCHEMA_VERSION);
     device.close();
   } finally {
     await rm(root, { recursive: true, force: true });

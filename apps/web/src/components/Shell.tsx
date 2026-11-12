@@ -2,23 +2,41 @@ import { type ReactNode, useEffect, useState } from 'react';
 
 import { Link, NavLink } from 'react-router';
 
+import logo from '@assets/images/logo.svg';
 import { listAnnouncements, markAnnouncementSeen, stripHtml } from '@tehqeqat/core';
 
 import { db } from '../db/client';
 import { useQuery } from '../hooks';
 import { t } from '../strings';
-import { BASE } from '../config';
 import { patchApp, useApp } from '../sync/store';
 import { applyUpdate } from '../update';
 import { Icon, type IconName } from './Icon';
 
-const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
-  { to: '/', label: t.nav.search, icon: 'search', end: true },
-  { to: '/all', label: t.nav.all, icon: 'list' },
-  { to: '/books', label: t.nav.books, icon: 'book' },
-  { to: '/saved', label: t.nav.saved, icon: 'bookmark' },
-  { to: '/more', label: t.nav.more, icon: 'menu' },
+// The header's links, as on the website (the app adds «محفوظ»).
+const TOP: { to: string; label: string; end?: boolean }[] = [
+  { to: '/', label: t.nav.home, end: true },
+  { to: '/search', label: t.nav.search },
+  { to: '/all', label: t.nav.all },
+  { to: '/chapters', label: t.nav.chapters },
+  { to: '/narrators', label: t.nav.narrators },
+  { to: '/books', label: t.nav.books },
+  { to: '/about', label: t.nav.about },
+  { to: '/saved', label: t.nav.saved },
 ];
+
+// The bottom bar on phones: the website's five tabs, with the app's own
+// «محفوظ» and «مزید» (settings, data, books, تعارف) in place of کتب and تعارف.
+const TABS: { to: string; label: string; icon: IconName; end?: boolean }[] = [
+  { to: '/', label: t.nav.tab.home, icon: 'home', end: true },
+  { to: '/search', label: t.nav.tab.search, icon: 'search' },
+  { to: '/all', label: t.nav.tab.all, icon: 'book-open' },
+  { to: '/saved', label: t.nav.tab.saved, icon: 'bookmark' },
+  { to: '/more', label: t.nav.tab.more, icon: 'menu' },
+];
+
+export function Logo({ className }: { className?: string }) {
+  return <img src={logo} alt={t.appName} width="168" height="43" className={className} />;
+}
 
 export function Shell({ children }: { children: ReactNode }) {
   return (
@@ -26,34 +44,99 @@ export function Shell({ children }: { children: ReactNode }) {
       <header className="topbar">
         <div className="topbar__inner">
           <Link to="/" className="brand" aria-label={t.appName}>
-            <img src={`${BASE}icons/mark.svg`} alt="" width="28" height="28" />
-            <span>{t.appName}</span>
+            <Logo />
           </Link>
-          <nav className="topnav" aria-label="اہم صفحات">
-            {NAV.map((n) => (
+          <nav className="topnav" aria-label={t.nav.menu}>
+            {TOP.map((n) => (
               <NavLink key={n.to} to={n.to} end={n.end}>
                 {n.label}
               </NavLink>
             ))}
-            <NavLink to="/chapters">{t.nav.chapters}</NavLink>
-            <NavLink to="/narrators">{t.nav.narrators}</NavLink>
-            <NavLink to="/about">{t.nav.about}</NavLink>
           </nav>
           <SyncBadge />
+          <Link to="/more" className="icon-btn topbar__menu" aria-label={t.nav.more}>
+            <Icon name="menu" />
+          </Link>
         </div>
       </header>
       <UpdateBanner />
       <Announcement />
       <main className="main">{children}</main>
-      <nav className="tabbar" aria-label="اہم صفحات">
-        {NAV.map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.end}>
-            <Icon name={n.icon} />
-            <span>{n.label}</span>
-          </NavLink>
-        ))}
+      <nav className="tabbar" aria-label={t.nav.menu}>
+        <ul>
+          {TABS.map((n) => (
+            <li key={n.to}>
+              <NavLink to={n.to} end={n.end}>
+                <span className="tabbar__icon">
+                  <Icon name={n.icon} />
+                </span>
+                <span>{n.label}</span>
+              </NavLink>
+            </li>
+          ))}
+        </ul>
       </nav>
     </div>
+  );
+}
+
+/** The website's dark footer: what it is, the main pages and how to reach the author. */
+export function SiteFooter() {
+  const links: [string, string][] = [
+    ['/search', t.nav.search],
+    ['/all', t.nav.all],
+    ['/chapters', t.nav.chapters],
+    ['/narrators', t.nav.narrators],
+    ['/books', t.nav.books],
+    ['/about', t.nav.about],
+  ];
+  return (
+    <footer className="site-footer">
+      <div className="site-footer__inner">
+        <div className="site-footer__about">
+          <Logo />
+          <p>{t.heroDescription}</p>
+        </div>
+        <nav aria-label={t.footer.heading}>
+          <p className="site-footer__heading">{t.footer.heading}</p>
+          <ul className="site-footer__links">
+            {links.map(([to, label]) => (
+              <li key={to}>
+                <Link to={to}>{label}</Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div>
+          <p className="site-footer__heading">{t.footer.contact}</p>
+          <ul className="site-footer__contact">
+            <li>
+              <a href={t.footer.phoneLink}>
+                <Icon name="phone" />
+                <span>
+                  {t.footer.mufti}: <span dir="ltr">{t.footer.phone}</span>
+                </span>
+              </a>
+            </li>
+            <li>
+              <a href={`mailto:${t.footer.emailAddress}`}>
+                <Icon name="mail" />
+                <span>
+                  {t.footer.email}: <span dir="ltr">{t.footer.emailAddress}</span>
+                </span>
+              </a>
+            </li>
+            <li>
+              <a href={t.footer.feedbackLink} target="_blank" rel="noreferrer" className="site-footer__feedback">
+                <Icon name="message" />
+                <span>{t.footer.feedback}</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <p className="site-footer__rights">{t.footer.rights}</p>
+    </footer>
   );
 }
 
@@ -105,7 +188,7 @@ function UpdateBanner() {
   );
 }
 
-// The website's text-banner announcement, shown once per announcement.
+// The website's text-banner announcement (its yellow bar), shown once per announcement.
 function Announcement() {
   const [closed, setClosed] = useState<string | null>(null);
   const { data } = useQuery(() => listAnnouncements(db), []);
@@ -115,7 +198,7 @@ function Announcement() {
   const title = typeof banner.title === 'string' ? banner.title : '';
   const content = typeof banner.content === 'string' ? stripHtml(banner.content) : '';
   return (
-    <div className="announce" role="status">
+    <div className="announce announce--site" role="status">
       <p>
         {title && <strong>{title} </strong>}
         {content}
@@ -135,11 +218,17 @@ function Announcement() {
   );
 }
 
-export function PageTitle({ title, sub }: { title: string; sub?: ReactNode }) {
+/**
+ * A page's heading in the website's tinted box: title, description and an
+ * optional line under it (a count, a date).
+ */
+export function PageTitle({ title, sub, note, children }: { title: string; sub?: ReactNode; note?: ReactNode; children?: ReactNode }) {
   return (
     <header className="page-title">
       <h1>{title}</h1>
       {sub && <p>{sub}</p>}
+      {note && <p className="page-title__note">{note}</p>}
+      {children}
     </header>
   );
 }

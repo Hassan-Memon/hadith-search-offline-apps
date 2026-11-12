@@ -10,34 +10,40 @@ import {
   hadithWebUrl,
   type HadithRow,
   isBookmarked,
-  normalize,
   parseSections,
-  queryTokens,
   recordVisit,
   relatedHadith,
-  stripHtml,
   toggleBookmark,
 } from '@tehqeqat/core';
 
-import { bookPath, chapterPath, HadithList, narratorPath } from '../components/HadithCard';
+import { bookPath, chapterPath, hadithPath, narratorPath } from '../components/HadithCard';
 import { Html } from '../components/Html';
 import { Icon } from '../components/Icon';
+import {
+  Contents,
+  type ReaderAction,
+  ReaderToolbar,
+  ResearchSections,
+  SectionTitle,
+  type StudyMark,
+  useSections,
+} from '../components/Reader';
 import { WEBSITE } from '../config';
 import { db } from '../db/client';
-import { usePref, useQuery } from '../hooks';
-import { fmt, fmtDay, t } from '../strings';
+import { useQuery } from '../hooks';
+import { fmtDay, t } from '../strings';
 import { useApp } from '../sync/store';
 
-const SIZES = ['s', 'm', 'l', 'xl'] as const;
-type Size = (typeof SIZES)[number];
-
-/** A section heading as one line of text for the contents list. */
-const label = (html: string | undefined) =>
-  stripHtml(html)
-    .replace(/\[\s*[\d۰-۹٠-٩]+\s*\]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/[:：]\s*$/, '')
-    .trim();
+/** A narrator's name as the book's «فہرستِ رُوات» writes it: in Arabic, Urdu until he has one. */
+export function NarratorName({ n }: { n: { name: string; arabic_name?: string | null } }) {
+  return n.arabic_name ? (
+    <span lang="ar" className="narrator-arabic">
+      {n.arabic_name}
+    </span>
+  ) : (
+    <span>{n.name}</span>
+  );
+}
 
 export function HadithPage() {
   const slug = decodeURIComponent(useParams().slug ?? '');
@@ -60,7 +66,6 @@ export function HadithPage() {
   const [saved, setSaved] = useState(false);
   const [toast, setToast] = useState('');
   const [busy, setBusy] = useState(false);
-  const [size, setSize] = usePref<Size>('size', 'm');
 
   useEffect(() => {
     if (!hadith) return;
@@ -70,48 +75,14 @@ export function HadithPage() {
   }, [hadith]);
 
   const sections = useMemo(() => parseSections(hadith?.html_content), [hadith?.html_content]);
-  // With a search query, open only the sections that contain it (like the website's bird's-eye view).
-  const tokens = useMemo(() => queryTokens(q), [q]);
-  const matches = useMemo(
+  const state = useSections(sections, q, hash);
+  const studyAt = useMemo(
     () =>
-      sections.map((s) => {
-        if (tokens.length === 0) return true;
-        const text = normalize(`${stripHtml(s.heading)} ${stripHtml(s.content)}`);
-        return tokens.some((tok) => text.includes(tok));
-      }),
-    [sections, tokens],
+      new Map<number, StudyMark>(
+        (narrators.data ?? []).map((n) => [n.start, { slug: n.slug, name: n.arabic_name || n.name, start: n.start }]),
+      ),
+    [narrators.data],
   );
-  const [open, setOpen] = useState<boolean[]>([]);
-  useEffect(() => setOpen(matches), [matches]);
-
-  // Headings that can be folded, for the contents list.
-  const contents = useMemo(
-    () =>
-      sections
-        .map((s, i) => ({ i, text: s.heading?.trim() && s.content?.trim() ? label(s.heading) : '' }))
-        .filter((c) => c.text),
-    [sections],
-  );
-  const studyAt = useMemo(() => new Map((narrators.data ?? []).map((n) => [n.start, n])), [narrators.data]);
-
-  const goTo = (i: number) => {
-    setOpen((o) => o.map((v, j) => (j === i ? true : v)));
-    requestAnimationFrame(() => document.getElementById(`s-${i}`)?.scrollIntoView({ block: 'start' }));
-  };
-
-  // Arriving from a narrator's page (#s-<n>): open that section and go to it.
-  useEffect(() => {
-    const m = /^#s-(\d+)$/.exec(hash);
-    if (m && sections.length) goTo(Number(m[1]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hash, sections.length]);
-
-  // Closed sections are not printed: open everything for the printer.
-  useEffect(() => {
-    const before = () => setOpen(sections.map(() => true));
-    window.addEventListener('beforeprint', before);
-    return () => window.removeEventListener('beforeprint', before);
-  }, [sections]);
 
   if (row.loading && !hadith) return null;
   if (!hadith) return <p className="empty page">{t.hadith.notFound}</p>;
@@ -135,6 +106,7 @@ export function HadithPage() {
     }
   };
 
+  const bookName = book.data?.book ?? hadith.book;
   const exportMeta = (r: HadithRow) => ({
     title: r.title_text,
     meta: [
@@ -170,180 +142,99 @@ export function HadithPage() {
     }
   };
 
-  const sizeIndex = Math.max(0, SIZES.indexOf(size));
-  const allOpen = open.length > 0 && open.every(Boolean);
+  const actions: ReaderAction[] = [
+    { icon: 'copy', label: t.hadith.copyText, hint: 'عنوان، حکم، پوری تحقیق اور حوالہ جات', onClick: () => void copyText() },
+    {
+      icon: 'file',
+      label: busy ? t.hadith.preparing : t.hadith.word,
+      hint: 'Word اور Google Docs دونوں میں کھلتی ہے',
+      onClick: () => void word(),
+      disabled: busy,
+    },
+    { icon: 'print', label: t.hadith.print, onClick: () => window.print() },
+    { icon: 'share', label: t.hadith.share, onClick: () => void share() },
+  ];
+  if (book.data?.pdf_pages) {
+    actions.push(
+      online
+        ? {
+            icon: 'download',
+            label: t.hadith.pdf,
+            hint: 'مطبوعہ کتاب کے وہی صفحات جن پر یہ روایت ہے',
+            href: `${WEBSITE}/api/hadith-pages/${encodeURIComponent(hadith.id)}`,
+          }
+        : { icon: 'download', label: t.hadith.pdf, onClick: () => say(t.hadith.pdfOffline) },
+    );
+  }
+  actions.push({ icon: 'globe', label: t.hadith.openWeb, href: hadithWebUrl(hadith.slug) });
 
   return (
     <article className="page reader">
-      <nav className="crumbs">
-        <Link to={bookPath(book.data?.book ?? hadith.book)}>{book.data?.book ?? hadith.book}</Link>
-        {chapter.data && <Link to={chapterPath(chapter.data.slug)}>{t.chapters.chapter(chapter.data.name)}</Link>}
-      </nav>
-      <Html as="h1" html={hadith.title_html} query={q} className="reader__title urdu" />
-      <p className="muted reader__by">
-        {t.hadith.reviewedBy}
-        {hadith.authored_at && <span className="block small">{t.hadith.published(fmtDay(hadith.authored_at))}</span>}
-      </p>
+      <div className="reader-head card">
+        <nav className="crumbs" aria-label="breadcrumb">
+          <Link to="/">{t.hadith.home}</Link>
+          <Link to={bookPath(bookName)}>{bookName}</Link>
+          {chapter.data && <Link to={chapterPath(chapter.data.slug)}>{t.chapters.chapter(chapter.data.name)}</Link>}
+        </nav>
+        <header className="reader-head__title">
+          <Link to={bookPath(bookName)} className="book-pill">
+            <Icon name="book-open" />
+            <span>{bookName}</span>
+          </Link>
+          <Html as="h1" html={hadith.title_html} query={q} className="reader__title urdu" />
+          <p className="reader__by">
+            <span>{t.hadith.reviewedBy}</span>
+            {hadith.authored_at && <span>{t.hadith.published(fmtDay(hadith.authored_at))}</span>}
+          </p>
+        </header>
 
-      {hadith.hukm_html && (
-        <section className="hukm" aria-label={t.hadith.hukm}>
-          {/* The stored text already starts with «حکم:», so the label is for screen readers only. */}
-          <h2 className="sr-only">{t.hadith.hukm}</h2>
-          <Html html={hadith.hukm_html} query={q} className="urdu" />
-        </section>
-      )}
+        {hadith.hukm_html && (
+          <section className="hukm" aria-label={t.hadith.hukm}>
+            {/* The stored text already starts with «حکم:», so the label is for screen readers only. */}
+            <h2 className="sr-only">{t.hadith.hukm}</h2>
+            <Html html={hadith.hukm_html} query={q} className="urdu" />
+          </section>
+        )}
 
-      <div className="toolbar no-print">
-        <button
-          type="button"
-          className={`btn ${saved ? 'btn--on' : ''}`}
-          aria-pressed={saved}
-          onClick={async () => setSaved(await toggleBookmark(db, hadith.id))}
-        >
-          <Icon name={saved ? 'bookmark-fill' : 'bookmark'} />
-          {saved ? t.hadith.bookmarked : t.hadith.bookmark}
-        </button>
-        <button type="button" className="btn" onClick={share}>
-          <Icon name="share" />
-          {t.hadith.share}
-        </button>
-        <button type="button" className="btn" onClick={() => void copyText()}>
-          <Icon name="copy" />
-          {t.hadith.copyText}
-        </button>
-        <button type="button" className="btn" disabled={busy} onClick={() => void word()}>
-          <Icon name="file" />
-          {busy ? t.hadith.preparing : t.hadith.word}
-        </button>
-        <button type="button" className="btn" onClick={() => window.print()}>
-          <Icon name="print" />
-          {t.hadith.print}
-        </button>
-        {book.data?.pdf_pages ? (
-          online ? (
-            <a className="btn" href={`${WEBSITE}/api/hadith-pages/${encodeURIComponent(hadith.id)}`} target="_blank" rel="noreferrer">
-              <Icon name="download" />
-              {t.hadith.pdf}
-            </a>
-          ) : (
-            <button type="button" className="btn" onClick={() => say(t.hadith.pdfOffline)}>
-              <Icon name="download" />
-              {t.hadith.pdf}
+        <ReaderToolbar
+          state={state}
+          actions={actions}
+          toast={toast}
+          extra={
+            <button
+              type="button"
+              className={`btn ${saved ? 'btn--on' : ''}`}
+              aria-pressed={saved}
+              onClick={async () => setSaved(await toggleBookmark(db, hadith.id))}
+            >
+              <Icon name={saved ? 'bookmark-fill' : 'bookmark'} />
+              {saved ? t.hadith.bookmarked : t.hadith.bookmark}
             </button>
-          )
-        ) : null}
-        <a className="btn" href={hadithWebUrl(hadith.slug)} target="_blank" rel="noreferrer">
-          <Icon name="globe" />
-          {t.hadith.openWeb}
-        </a>
-        <span className="seg seg--small" role="group" aria-label={t.more.textSize}>
-          <button type="button" aria-label="−" disabled={sizeIndex === 0} onClick={() => setSize(SIZES[sizeIndex - 1]!)}>
-            ا−
-          </button>
-          <button
-            type="button"
-            aria-label="+"
-            disabled={sizeIndex === SIZES.length - 1}
-            onClick={() => setSize(SIZES[sizeIndex + 1]!)}
-          >
-            ا+
-          </button>
-        </span>
-        {toast && (
-          <span className="toast" role="status">
-            {toast}
-          </span>
-        )}
-      </div>
-
-      {contents.length > 2 && (
-        <details className="toc card no-print">
-          <summary>
-            <Icon name="toc" /> {t.hadith.contents}{' '}
-            <span className="muted small">({t.hadith.contentsCount(contents.length)})</span>
-          </summary>
-          <ol>
-            {contents.map((c, n) => (
-              <li key={c.i}>
-                <a
-                  href={`#s-${c.i}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    goTo(c.i);
-                  }}
-                >
-                  <span className="toc__n">{fmt(n + 1)}</span>
-                  {c.text}
-                  {studyAt.has(c.i) && <span className="chip chip--soft">{t.nav.narrators}</span>}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </details>
-      )}
-
-      <div className="section__head">
-        <h2 className="reader__h2">{t.hadith.details}</h2>
-        {contents.length > 1 && (
-          <button
-            type="button"
-            className="btn btn--small no-print"
-            onClick={() => setOpen(sections.map(() => !allOpen))}
-          >
-            {allOpen ? t.hadith.collapseAll : t.hadith.expandAll}
-          </button>
-        )}
-      </div>
-      <div className="sections">
-        {sections.map((s, i) => {
-          const heading = s.heading?.trim();
-          const content = s.content?.trim();
-          const study = studyAt.get(i);
-          if (heading && content) {
-            return (
-              <details
-                key={i}
-                id={`s-${i}`}
-                className="section-fold"
-                open={open[i] ?? matches[i]}
-                onToggle={(e) => {
-                  const isOpen = (e.currentTarget as HTMLDetailsElement).open;
-                  setOpen((o) => (o[i] === isOpen ? o : o.map((v, j) => (j === i ? isOpen : v))));
-                }}
-              >
-                <summary>
-                  <Html as="span" html={heading} query={q} className="urdu" />
-                </summary>
-                {study && (
-                  <p className="study-link no-print">
-                    <Link to={narratorPath(study.slug)} className="chip chip--soft">
-                      {t.narrators.page}: {study.name} ←
-                    </Link>
-                  </p>
-                )}
-                <Html html={content} query={q} className="urdu prose" />
-              </details>
-            );
           }
-          return <Html key={i} html={heading || content} query={q} className="urdu prose" />;
-        })}
+        />
       </div>
+
+      <Contents state={state} studies={studyAt} />
+
+      <SectionTitle>{t.hadith.details}</SectionTitle>
+      <ResearchSections sections={sections} state={state} q={q} studies={studyAt} />
 
       {hadith.references_html && (
         <section className="refs">
-          <h2>{t.hadith.references}</h2>
-          <Html html={hadith.references_html} className="urdu prose prose--small" />
+          <SectionTitle>{t.hadith.references}</SectionTitle>
+          <Html html={hadith.references_html} className="urdu prose prose--small card" />
         </section>
       )}
 
       {narrators.data && narrators.data.length > 0 && (
         <section className="section no-print">
-          <h2>{t.narrators.inNarration}</h2>
+          <SectionTitle>{t.narrators.inNarration}</SectionTitle>
           <ul className="chips">
             {narrators.data.map((n) => (
               <li key={`${n.slug}-${n.start}`}>
-                <Link to={narratorPath(n.slug)} className="chip chip--link">
-                  {n.name}
+                <Link to={narratorPath(n.slug)} className="narrator-chip">
+                  <Icon name="user" />
+                  <NarratorName n={n} />
                 </Link>
               </li>
             ))}
@@ -353,8 +244,16 @@ export function HadithPage() {
 
       {related.data && related.data.length > 0 && (
         <section className="section no-print">
-          <h2>{t.hadith.related}</h2>
-          <HadithList items={related.data} />
+          <SectionTitle>{t.hadith.related}</SectionTitle>
+          <ul className="related">
+            {related.data.map((r) => (
+              <li key={r.id}>
+                <Link to={hadithPath(r.slug)}>
+                  <Html as="span" html={r.title_html} className="urdu" />
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </article>

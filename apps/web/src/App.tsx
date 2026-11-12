@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router';
 
-import { Shell } from './components/Shell';
+import { Logo, Shell } from './components/Shell';
 import { BASE } from './config';
 import { HadithPage } from './pages/Hadith';
 import { AllPage, BookPage, BooksPage, ChapterPage, ChaptersPage } from './pages/Lists';
@@ -35,7 +35,9 @@ function FirstRun() {
   const pct = progress?.fraction !== undefined ? Math.round(progress.fraction * 100) : null;
   return (
     <div className="firstrun">
-      <img src={`${BASE}icons/mark.svg`} alt="" width="72" height="72" />
+      <span className="firstrun__logo">
+        <Logo />
+      </span>
       <h1>{t.appName}</h1>
       <h2>{t.sync.firstTitle}</h2>
       <p>{t.sync.firstBody}</p>
@@ -71,7 +73,9 @@ function FirstRun() {
 function Opening() {
   return (
     <div className="firstrun" aria-busy="true">
-      <img src={`${BASE}icons/mark.svg`} alt="" width="72" height="72" />
+      <span className="firstrun__logo">
+        <Logo />
+      </span>
       <h1>{t.appName}</h1>
       <p className="muted small">{t.sync.opening}</p>
     </div>
@@ -82,7 +86,9 @@ function Opening() {
 function Busy() {
   return (
     <div className="firstrun">
-      <img src={`${BASE}icons/mark.svg`} alt="" width="72" height="72" />
+      <span className="firstrun__logo">
+        <Logo />
+      </span>
       <h1>{t.appName}</h1>
       <p>{t.sync.busy}</p>
       <button type="button" className="btn btn--primary" onClick={retryOpen}>

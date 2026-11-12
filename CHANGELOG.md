@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-11-12 — 1.3.0: the website's narrators and search, and its look
+
+Brings the website's updates of 8–11 November into the app, and dresses the
+app like the website. Details and measurements: `docs/1.3.0-website-updates.md`.
+
+- **Looks like the website:** its dark header with the calligraphic logo, the
+  home page picture with the search box, «یہاں کیا ہے؟» cards, the dark footer,
+  tinted page headings, the bottom bar with the current tab in a pill, the
+  narration page's header card, the website's cyan and Nastaliq interface.
+  Dark mode kept.
+- **روات حدیث:** names in Arabic (with the Urdu name on the narrator's page),
+  in the order of the book's «فہرستِ رُوات»; search in Arabic or Urdu; sort by
+  name, death or mentions; cards with the death date and the study's opening.
+  317 narrators (spellings the website merged are one, and old addresses
+  still work).
+- **A narrator's page** shows the study from his latest volume, as the website
+  does (same book for all 317), laid out like a narration with its contents,
+  tools, copy and Word file, and the footnotes it cites; his other studies are
+  listed under it.
+- **Search** needs most of the typed words, as the website now does: «نماز کی
+  فضیلت» finds 206 narrations instead of 891. Looser spellings only when the
+  exact words find fewer than three, with the website's note. As fast as before.
+- **Copied text** keeps words whole that Word had split across two spans.
+- **No new download:** data schema 3 only adds two narrator columns. The
+  published snapshot is upgraded in place, so devices fetch the registry
+  (42 KB) and keep everything else. Apps on 1.2 update themselves first.
+- Development: `pnpm dev` can do a first download again (the dev server no
+  longer marks the snapshot as gzip-encoded).
+
 ## 2026-11-07 — 1.2.0: ابواب, رواۃ, the book registry and the website's reader tools
 
 Brings the website's updates of 4–7 November into the app, offline.

@@ -50,12 +50,14 @@ tehqeqatehadees.com (unchanged)          GitHub Actions, every hour         the 
 - **After that** the app reads the small change files: on start, every 6 hours
   while open, when the device comes back online, and when the app returns to
   the foreground. Deletions arrive too.
-- **Search** runs on the device: Urdu/Arabic normaliser (ی/ي، ک/ك، ہ/ه/ۃ،
-  harakat), ranked phrase → all words → any word.
+- **Search** runs on the device with the website's rules: most of the typed
+  words must be in a narration, looser spellings only when that finds too
+  little; Urdu/Arabic normaliser (ی/ي، ک/ك، ہ/ه/ۃ، harakat).
 - **Books, chapters and narrators** come from the website's registries
   (`/api/books`, `/api/chapters`, `/api/narrators`). Devices download them
   only when they change. A narrator's page is built on the device from the
-  sections of the narrations that study him; nothing extra is downloaded.
+  sections of the narrations that study him (his latest volume first, as on
+  the website); nothing extra is downloaded.
 - **The app itself** is cached by a service worker, so it opens with no
   connection. A new version downloads in the background (checked hourly and
   when the app returns to the foreground) and switches over when the app goes
@@ -64,8 +66,9 @@ tehqeqatehadees.com (unchanged)          GitHub Actions, every hour         the 
   (`min_app_version`), it updates straight away. No store review, no
   reinstall.
 
-Details: `packages/core/README.md`. What 1.2.0 brought over from the website,
-with size and speed measurements: `docs/1.2.0-website-updates.md`.
+Details: `packages/core/README.md`. What each release brought over from the
+website, with size and speed measurements: `docs/1.2.0-website-updates.md`,
+`docs/1.3.0-website-updates.md` (also the website's look).
 
 ## Repository layout
 

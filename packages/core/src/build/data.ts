@@ -121,8 +121,14 @@ interface SiteNarrator extends Partial<Narrator> {
   chars?: number;
 }
 
-/** 1.2.0 reads schema 2: chapters, narrators, the book registry. */
+/**
+ * Apps older than this cannot read the data. Schema 3 (narrators' Arabic
+ * names) needs no new app version for that: an app on schema 2 sees the
+ * manifest's schema 3 and updates itself before it syncs.
+ */
 const MIN_APP_VERSION = '1.2.0';
+/** The oldest published schema the builder upgrades in place (2 → 3 adds two registry columns). */
+const FIRST_UPGRADABLE_SCHEMA = 2;
 const SIGNATURES_FILE = 'narrator-signatures.json';
 /** Narrators whose entry changed in one run before the run refetches every hadith instead. */
 const MAX_NARRATOR_LOOKUPS = 40;
@@ -221,6 +227,8 @@ export function toRegistry(books: SiteBook[], chapters: SiteChapter[], narrators
         death_note: n.death_note || null,
         death_year: typeof n.death_year === 'number' ? n.death_year : null,
         century: typeof n.century === 'number' ? n.century : null,
+        arabic_name: typeof n.arabic_name === 'string' && n.arabic_name.trim() ? n.arabic_name.trim() : null,
+        excerpt: typeof n.excerpt === 'string' && n.excerpt.trim() ? n.excerpt.trim() : null,
       })),
   };
 }
@@ -336,7 +344,12 @@ export async function buildData(o: BuildOptions): Promise<BuildResult> {
         }
         fullReason = 'nothing published yet';
       }
-      if (prev && prev.schema_version !== SCHEMA_VERSION) fullReason = `schema ${prev.schema_version} → ${SCHEMA_VERSION}`;
+      // A newer schema that only adds columns (see MIGRATIONS) upgrades the
+      // published snapshot in place: devices migrate the same way and keep
+      // their data, so no one downloads the whole snapshot again.
+      if (prev && (prev.schema_version < FIRST_UPGRADABLE_SCHEMA || prev.schema_version > SCHEMA_VERSION)) {
+        fullReason = `schema ${prev.schema_version} → ${SCHEMA_VERSION}`;
+      }
       else if (prev && !prev.epoch) fullReason = 'previous build has no epoch';
       else if (prev && !prev.snapshot) fullReason = 'previous build has no snapshot';
       if (fullReason) {

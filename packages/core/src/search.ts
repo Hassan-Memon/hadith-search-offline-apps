@@ -1,5 +1,13 @@
-// Offline search over hadith_fts, ranked the way the website ranks:
-// phrase matches, then all words, then any word; bm25 within each tier.
+// Offline search over hadith_fts, with the website's rules (since 11 Nov
+// 2026): a narration must hold most of the typed words, not just one of them,
+// or one common word such as «کا» matches every narration. Three levels, the
+// next tried only when one finds fewer than SEARCH_MIN_RESULTS:
+//   0. exact words: up to two words all must be there, longer queries 75%;
+//   1. the same, a word's ending may differ (خطبہ/خطبے, چہرہ/چہرے);
+//   2. half the words, endings loose.
+// The exact phrase ranks first, then the words close together as typed, then
+// the narrations holding more of the words; bm25 (title words count more)
+// within each.
 import type { DbAdapter } from './db/adapter.js';
 import { bookFilter, bookSpellings, LIST_COLUMNS } from './db/repo.js';
 import { parseSections, stripHtml } from './html.js';
@@ -15,20 +23,46 @@ export interface SearchOptions {
   tag?: string;
 }
 
+export const SEARCH_MIN_RESULTS = 3;
+/** Words close together: at most this many other words between them. */
+const NEAR_DISTANCE = 3;
+
 const quote = (token: string) => `"${token.replace(/"/g, '""')}"`;
 
-/** Build the three FTS5 MATCH expressions for a query. */
-export function buildMatchExpressions(query: string): { phrase: string; all: string; any: string } | null {
+/** How many of n typed words a narration must hold at each level. */
+export function wordsNeeded(n: number, level: number): number {
+  if (n <= 0) return 0;
+  if (level < 2) return n <= 2 ? n : Math.floor(n * 0.75);
+  return Math.max(1, Math.floor(n * 0.5));
+}
+
+/**
+ * One word as an FTS5 term. The last word is a prefix so typing feels quick
+ * («نما» finds «نماز»). Loose (levels 1 and 2): a word of four letters or more
+ * may end differently, the way the website allows a letter or two.
+ */
+export function wordTerm(token: string, last: boolean, loose: boolean): string {
+  const letters = [...token];
+  if (loose && letters.length >= 4) {
+    const keep = letters.length >= 7 ? letters.length - 2 : letters.length - 1;
+    return `${quote(letters.slice(0, keep).join(''))}*`;
+  }
+  return last && letters.length >= 2 ? `${quote(token)}*` : quote(token);
+}
+
+/** The FTS5 expressions for one query: each word, the phrase, the words near each other, and all of them for scoring. */
+export function buildMatchExpressions(query: string, loose = false) {
   const tokens = queryTokens(query);
   if (tokens.length === 0) return null;
-  // Prefix matching on the last token so typing feels responsive: «نما» finds «نماز».
-  const quoted = tokens.map(quote);
-  const last = quoted.length - 1;
-  const prefixed = quoted.map((t, i) => (i === last && tokens[last]!.length >= 2 ? `${t}*` : t));
+  const last = tokens.length - 1;
+  const words = tokens.map((t, i) => wordTerm(t, i === last, loose));
+  const exact = tokens.map((t, i) => wordTerm(t, i === last, false));
   return {
+    tokens,
+    words,
     phrase: quote(tokens.join(' ')) + (tokens[last]!.length >= 2 ? '*' : ''),
-    all: prefixed.join(' AND '),
-    any: prefixed.join(' OR '),
+    near: tokens.length > 1 ? `NEAR(${exact.join(' ')}, ${NEAR_DISTANCE})` : null,
+    any: words.join(' OR '),
   };
 }
 
@@ -40,8 +74,7 @@ export async function searchHadith(
   query: string,
   { page = 1, pageSize = 10, book, chapter, tag }: SearchOptions = {},
 ): Promise<SearchResult> {
-  const match = buildMatchExpressions(query);
-  if (!match) return { total: 0, page, pageSize, hits: [] };
+  if (queryTokens(query).length === 0) return { total: 0, page, pageSize, hits: [] };
 
   const filters: string[] = [];
   const filterParams: string[] = [];
@@ -58,39 +91,67 @@ export async function searchHadith(
     filters.push('EXISTS (SELECT 1 FROM json_each(h.tags_json) WHERE value = ?)');
     filterParams.push(tag);
   }
-  const whereSql = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+  const whereSql = filters.length ? `AND ${filters.join(' AND ')}` : '';
+  const columns = LIST_COLUMNS.split(', ')
+    .map((c) => `h.${c}`)
+    .join(', ');
 
-  const cte = `
-    WITH m AS (
-      SELECT id, 0 AS tier, ${BM25} AS score FROM hadith_fts WHERE hadith_fts MATCH ?
-      UNION ALL
-      SELECT id, 1, ${BM25} FROM hadith_fts WHERE hadith_fts MATCH ?
-      UNION ALL
-      SELECT id, 2, ${BM25} FROM hadith_fts WHERE hadith_fts MATCH ?
-    ),
-    best AS (SELECT id, min(tier) AS tier, min(score) AS score FROM m GROUP BY id)
-  `;
-  const matchParams = [match.phrase, match.all, match.any];
+  for (let level = 0; level <= 2; level++) {
+    const match = buildMatchExpressions(query, level > 0)!;
+    const n = match.tokens.length;
+    // Level 1 is level 0 again when no word is long enough to loosen.
+    if (level === 1 && match.words.join() === buildMatchExpressions(query, false)!.words.join()) continue;
+    // A narration and how many of the typed words it holds. MATERIALIZED:
+    // each full-text query runs once, not once per row that joins it.
+    const cte = `
+      WITH w AS (${match.words.map((_, k) => `SELECT id, ${k} AS k FROM hadith_fts WHERE hadith_fts MATCH ?`).join(' UNION ALL ')}),
+      hit AS MATERIALIZED (SELECT id, count(DISTINCT k) AS n FROM w GROUP BY id HAVING n >= ?)
+    `;
+    const cteParams: (string | number)[] = [...match.words, wordsNeeded(n, level)];
 
-  const totalRow = await db.get<{ c: number }>(
-    `${cte} SELECT count(*) AS c FROM best JOIN hadith h ON h.id = best.id ${whereSql}`,
-    [...matchParams, ...filterParams],
-  );
-  const rows = await db.all<HadithListItem & { tier: number; html_content: string }>(
-    `${cte} SELECT ${LIST_COLUMNS.split(', ')
-      .map((c) => `h.${c}`)
-      .join(', ')}, h.html_content, best.tier
-     FROM best JOIN hadith h ON h.id = best.id ${whereSql}
-     ORDER BY best.tier, best.score LIMIT ? OFFSET ?`,
-    [...matchParams, ...filterParams, pageSize, (Math.max(1, page) - 1) * pageSize],
-  );
-
-  const tokens = queryTokens(query);
-  const hits: SearchHit[] = rows.map(({ html_content, ...row }) => ({
-    ...row,
-    snippet: makeSnippet(sectionsText(html_content), tokens),
-  }));
-  return { total: Number(totalRow?.c ?? 0), page, pageSize, hits };
+    // Order: the phrase, then the words near each other (two words or more),
+    // then more of the words, then bm25. Only ids and small columns are
+    // sorted; the text is read for the page's rows alone.
+    const fts = (name: string) => `${name} AS MATERIALIZED (SELECT id FROM hadith_fts WHERE hadith_fts MATCH ?)`;
+    const rankCtes = [...(n > 1 ? [fts('ph')] : []), ...(match.near ? [fts('nr')] : [])];
+    const rankParams = [...(n > 1 ? [match.phrase] : []), ...(match.near ? [match.near] : [])];
+    const rows = await db.all<HadithListItem & { html_content: string; total: number }>(
+      `${cte},
+       sc AS MATERIALIZED (SELECT id, ${BM25} AS score FROM hadith_fts WHERE hadith_fts MATCH ?)
+       ${rankCtes.map((c) => `, ${c}`).join('')},
+       pg AS (
+         SELECT hit.id,
+           ${n > 1 ? '(hit.id IN ph)' : '0'} AS p,
+           ${match.near ? '(hit.id IN nr)' : '0'} AS nr,
+           hit.n AS n, sc.score AS score, count(*) OVER () AS total
+         FROM hit JOIN hadith h ON h.id = hit.id LEFT JOIN sc ON sc.id = hit.id
+         WHERE 1 ${whereSql}
+         ORDER BY p DESC, nr DESC, hit.n DESC, sc.score
+         LIMIT ? OFFSET ?
+       )
+       SELECT ${columns}, h.html_content, pg.total
+       FROM pg JOIN hadith h ON h.id = pg.id
+       ORDER BY pg.p DESC, pg.nr DESC, pg.n DESC, pg.score`,
+      [...cteParams, match.any, ...rankParams, ...filterParams, pageSize, (Math.max(1, page) - 1) * pageSize],
+    );
+    // The count comes with the page; a page past the end needs it asked for.
+    let total = Number(rows[0]?.total ?? 0);
+    if (rows.length === 0 && page > 1) {
+      const row = await db.get<{ c: number }>(
+        `${cte} SELECT count(*) AS c FROM hit JOIN hadith h ON h.id = hit.id WHERE 1 ${whereSql}`,
+        [...cteParams, ...filterParams],
+      );
+      total = Number(row?.c ?? 0);
+    }
+    if (total < SEARCH_MIN_RESULTS && level < 2) continue;
+    const hits: SearchHit[] = rows.map(({ html_content, total: _total, ...row }) => ({
+      ...row,
+      tier: level,
+      snippet: makeSnippet(sectionsText(html_content), match.tokens),
+    }));
+    return { total, page, pageSize, hits, relaxed: level > 0 && total > 0 };
+  }
+  return { total: 0, page, pageSize, hits: [] };
 }
 
 /** Plain text of the stored sections (used for snippets; raw_content is not kept on device). */
