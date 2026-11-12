@@ -23,6 +23,9 @@ app like the website. Details and measurements: `docs/1.3.0-website-updates.md`.
   فضیلت» finds 206 narrations instead of 891. Looser spellings only when the
   exact words find fewer than three, with the website's note. As fast as before.
 - **Copied text** keeps words whole that Word had split across two spans.
+- **کتب خانہ** says where the books themselves are: the app lists each book's
+  narrations, and a note links to the website's کتب خانہ to read or download
+  the whole book (needs internet).
 - **No new download:** data schema 3 only adds two narrator columns. The
   published snapshot is upgraded in place, so devices fetch the registry
   (42 KB) and keep everything else. Apps on 1.2 update themselves first.
