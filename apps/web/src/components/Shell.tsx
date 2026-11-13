@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react';
 
-import { Link, NavLink } from 'react-router';
+import { Link, NavLink, useLocation } from 'react-router';
 
 import logo from '@assets/images/logo.svg';
 import { listAnnouncements, markAnnouncementSeen, stripHtml } from '@tehqeqat/core';
@@ -12,33 +12,75 @@ import { patchApp, useApp } from '../sync/store';
 import { applyUpdate } from '../update';
 import { Icon, type IconName } from './Icon';
 
-// The header's links, as on the website (the app adds «محفوظ»).
+// The header's links, as on the website since 13 Nov 2026 (the app adds
+// «محفوظ»). «ابواب» is not a menu entry: it is a view of «تمام احادیث», the
+// switch at the top of /all and /chapters, and both light «تمام احادیث».
 const TOP: { to: string; label: string; end?: boolean }[] = [
   { to: '/', label: t.nav.home, end: true },
   { to: '/search', label: t.nav.search },
   { to: '/all', label: t.nav.all },
-  { to: '/chapters', label: t.nav.chapters },
   { to: '/narrators', label: t.nav.narrators },
   { to: '/books', label: t.nav.books },
   { to: '/about', label: t.nav.about },
   { to: '/saved', label: t.nav.saved },
 ];
 
-// The bottom bar on phones: the website's five tabs, with the app's own
-// «محفوظ» and «مزید» (settings, data, books, تعارف) in place of کتب and تعارف.
+// The bottom bar on phones: the website's صفحۂ اول، تلاش، احادیث، روات, with
+// the app's «مزید» (محفوظ، کتب خانہ، تعارف, settings and data) where the
+// website has کتب.
 const TABS: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: t.nav.tab.home, icon: 'home', end: true },
   { to: '/search', label: t.nav.tab.search, icon: 'search' },
   { to: '/all', label: t.nav.tab.all, icon: 'book-open' },
-  { to: '/saved', label: t.nav.tab.saved, icon: 'bookmark' },
+  { to: '/narrators', label: t.nav.tab.narrators, icon: 'users' },
   { to: '/more', label: t.nav.tab.more, icon: 'menu' },
 ];
 
-export function Logo({ className }: { className?: string }) {
-  return <img src={logo} alt={t.appName} width="168" height="43" className={className} />;
+/** «/chapters» is the by-chapter view of «تمام احادیث», so it lights that entry. */
+function useActive() {
+  const { pathname } = useLocation();
+  return (to: string, isActive: boolean) =>
+    isActive || (to === '/all' && pathname.startsWith('/chapters')) ? 'active' : undefined;
+}
+
+/**
+ * The website's lockup: the calligraphy is the book's name, «غیر معتبر روایات
+ * کا فنی جائزہ», with the site's name, «تحقیقاتِ حدیث», in a small line under it.
+ */
+export function Logo({ className, withName = true }: { className?: string; withName?: boolean }) {
+  return (
+    <span className={`logo ${className ?? ''}`}>
+      <img src={logo} alt={t.bookTitle} width="211" height="54" />
+      {withName && <span className="logo__name">{t.appName}</span>}
+    </span>
+  );
+}
+
+/** «اوپر جائیں»: a round button once the reader is far down a long page. */
+function BackToTop() {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const update = () => setShown(window.scrollY > 1200);
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+  return (
+    <button
+      type="button"
+      className={`back-to-top no-print ${shown ? 'back-to-top--shown' : ''}`}
+      aria-label={t.nav.backToTop}
+      title={t.nav.backToTop}
+      tabIndex={shown ? 0 : -1}
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+    >
+      <Icon name="up" />
+    </button>
+  );
 }
 
 export function Shell({ children }: { children: ReactNode }) {
+  const active = useActive();
   return (
     <div className="shell">
       <header className="topbar">
@@ -48,7 +90,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </Link>
           <nav className="topnav" aria-label={t.nav.menu}>
             {TOP.map((n) => (
-              <NavLink key={n.to} to={n.to} end={n.end}>
+              <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => active(n.to, isActive)}>
                 {n.label}
               </NavLink>
             ))}
@@ -62,11 +104,12 @@ export function Shell({ children }: { children: ReactNode }) {
       <UpdateBanner />
       <Announcement />
       <main className="main">{children}</main>
+      <BackToTop />
       <nav className="tabbar" aria-label={t.nav.menu}>
         <ul>
           {TABS.map((n) => (
             <li key={n.to}>
-              <NavLink to={n.to} end={n.end}>
+              <NavLink to={n.to} end={n.end} className={({ isActive }) => active(n.to, isActive)}>
                 <span className="tabbar__icon">
                   <Icon name={n.icon} />
                 </span>
@@ -85,7 +128,6 @@ export function SiteFooter() {
   const links: [string, string][] = [
     ['/search', t.nav.search],
     ['/all', t.nav.all],
-    ['/chapters', t.nav.chapters],
     ['/narrators', t.nav.narrators],
     ['/books', t.nav.books],
     ['/about', t.nav.about],
@@ -197,12 +239,20 @@ function Announcement() {
   if (!banner || closed === banner.id) return null;
   const title = typeof banner.title === 'string' ? banner.title : '';
   const content = typeof banner.content === 'string' ? stripHtml(banner.content) : '';
+  const text = (
+    <>
+      {title && <strong>{title} </strong>}
+      {content}
+    </>
+  );
   return (
     <div className="announce announce--site" role="status">
-      <p>
-        {title && <strong>{title} </strong>}
-        {content}
-      </p>
+      <div className="ticker" aria-label={`${title} ${content}`}>
+        <p className="ticker__track" aria-hidden="true">
+          <span>{text}</span>
+          <span>{text}</span>
+        </p>
+      </div>
       <button
         type="button"
         className="icon-btn"
@@ -226,7 +276,7 @@ export function PageTitle({ title, sub, note, children }: { title: string; sub?:
   return (
     <header className="page-title">
       <h1>{title}</h1>
-      {sub && <p>{sub}</p>}
+      {sub && <div className="page-title__sub">{sub}</div>}
       {note && <p className="page-title__note">{note}</p>}
       {children}
     </header>

@@ -205,6 +205,14 @@ export async function getChapter(db: DbAdapter, slug: string): Promise<ChapterCo
  * One hadith from each chapter («ہر باب سے ایک روایت»). The same seed gives
  * the same picks and order, so a list does not reshuffle while it is read.
  */
+/**
+ * The chapter of prefaces, introductions and method notes (مقدمہ, a scholar's
+ * تعارف, مراتبِ جرح …). They are stored like narrations but are not ones, so
+ * lists of narrations (the per-chapter samples, «متعلقہ روایات») leave them
+ * out, as the website does since 13 Nov 2026. The chapter keeps its own page.
+ */
+export const INTRO_CHAPTER = 'مقدمات-و-تعارف';
+
 export async function chapterSamples(
   db: DbAdapter,
   seed: number,
@@ -214,8 +222,9 @@ export async function chapterSamples(
     `SELECT ${prefixed('h')}, c.name AS chapter_name
      FROM chapters c JOIN hadith h ON h.rowid = (
        SELECT rowid FROM hadith WHERE chapter = c.slug ORDER BY (rowid * ?) % 1009, rowid LIMIT 1)
+     WHERE c.slug <> ?
      ORDER BY (c.rowid * ?) % 1013, c.rowid`,
-    [s, s],
+    [s, INTRO_CHAPTER, s],
   );
 }
 
@@ -246,9 +255,11 @@ export async function relatedHadith(
        UNION ALL
        SELECT ${prefixed('h')}, 1, h.rowid FROM hadith h
        WHERE ${bookFilter(spellings)} AND h.id <> ? AND (? IS NULL OR h.chapter IS NOT ?)
+         -- A narration is not offered a preface as related (a preface may be).
+         AND (? = ? OR h.chapter IS NOT ?)
      )
      ORDER BY grp, abs(r - (SELECT rowid FROM hadith WHERE id = ?)) LIMIT ?`,
-    [ch, ch, id, ...spellings, id, ch, ch, id, limit],
+    [ch, ch, id, ...spellings, id, ch, ch, ch ?? '', INTRO_CHAPTER, INTRO_CHAPTER, id, limit],
   );
 }
 
@@ -416,6 +427,43 @@ export async function narratorStudies(db: DbAdapter, slug: string): Promise<Narr
   return out;
 }
 
+/**
+ * The other narrators studied in the same narrations as this one, most shared
+ * first (the website's «اسی روایت کے دیگر روات» / «انہی روایات کے دیگر روات»),
+ * with how many narrations discuss each, for their cards.
+ */
+export async function relatedNarrators(db: DbAdapter, slug: string, limit = 12): Promise<NarratorListItem[]> {
+  const rows = await db.all<NarratorDbRow & { shared: number }>(
+    `SELECT n.*, count(DISTINCT h.id) AS shared
+     FROM hadith h
+     JOIN json_each(h.narrators_json) a
+     JOIN json_each(h.narrators_json) b
+     JOIN narrators n ON n.slug = json_extract(b.value, '$.slug')
+     WHERE h.narrators_json <> '[]' AND json_extract(a.value, '$.slug') = ? AND n.slug <> ?
+     GROUP BY n.slug
+     ORDER BY shared DESC
+     LIMIT ?`,
+    [slug, slug, limit],
+  );
+  if (rows.length === 0) return [];
+  const counts = await db.all<{ slug: string; studies: number; hadith: number }>(
+    `SELECT json_extract(j.value, '$.slug') AS slug, count(*) AS studies, count(DISTINCT h.id) AS hadith
+     FROM hadith h, json_each(h.narrators_json) j
+     WHERE h.narrators_json <> '[]' AND json_extract(j.value, '$.slug') IN (${rows.map(() => '?').join(', ')})
+     GROUP BY 1`,
+    rows.map((r) => r.slug),
+  );
+  const bySlug = new Map(counts.map((c) => [c.slug, c]));
+  return rows
+    .map(({ shared, ...r }) => ({ r: toNarrator(r), shared }))
+    .sort((a, b) => b.shared - a.shared || (narratorSortKey(a.r) < narratorSortKey(b.r) ? -1 : 1))
+    .map(({ r }) => ({
+      ...r,
+      study_count: Number(bySlug.get(r.slug)?.studies ?? 0),
+      hadith_count: Number(bySlug.get(r.slug)?.hadith ?? 0),
+    }));
+}
+
 /** The narrators studied in one narration, with their names, in the order of the text. */
 export async function hadithNarrators(
   db: DbAdapter,
@@ -549,7 +597,8 @@ export async function replaceFiles(db: DbAdapter, records: FileRecord[]): Promis
       'INSERT INTO files (id, name, url, image_url, bytes, local_path, downloaded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         record.id,
-        record.file?.name ?? '',
+        // The book's name when the registry links a book to this file.
+        (typeof record.book === 'string' && record.book) || record.file?.name || '',
         record.file?.url ?? '',
         record.image?.url ?? null,
         typeof record.file?.size === 'number' ? record.file.size : null,
@@ -571,7 +620,8 @@ export interface FileRow {
 }
 
 export async function listFiles(db: DbAdapter): Promise<FileRow[]> {
-  return db.all<FileRow>('SELECT * FROM files ORDER BY name');
+  // In the order published (the website's book order, see the data builder).
+  return db.all<FileRow>('SELECT * FROM files ORDER BY rowid');
 }
 
 export async function setFileDownloaded(db: DbAdapter, id: string, localPath: string | null): Promise<void> {

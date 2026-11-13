@@ -95,7 +95,7 @@ interface ListItem {
 }
 
 /** What the website's registries answer (only the fields the app uses). */
-interface SiteBook {
+export interface SiteBook {
   name: string;
   volume_no?: number | null;
   sort_order?: number | null;
@@ -231,6 +231,27 @@ export function toRegistry(books: SiteBook[], chapters: SiteChapter[], narrators
         excerpt: typeof n.excerpt === 'string' && n.excerpt.trim() ? n.excerpt.trim() : null,
       })),
   };
+}
+
+/**
+ * The PDF library in the order the website shows it (since 13 Nov 2026): the
+ * books' order in the book registry, each book pointing at its file; a file
+ * no book points at keeps its place after them. A file a book points at also
+ * gets the book's name (`book`), which the app shows instead of «Vol-1.pdf»
+ * and links to that book's narrations; older apps ignore the field.
+ */
+export function inBookOrder<T>(files: T[], books: SiteBook[]): (T & { book?: string })[] {
+  const linked = new Map<string, { rank: number; name: string }>();
+  [...books]
+    .sort((a, b) => (a.sort_order ?? Infinity) - (b.sort_order ?? Infinity))
+    .forEach((b, i) => {
+      if (b.pdf_file_id && !linked.has(b.pdf_file_id)) linked.set(b.pdf_file_id, { rank: i, name: b.name });
+    });
+  const id = (f: T) => String((f as { id?: unknown })?.id ?? '');
+  return files
+    .map((f, i) => ({ f, i, book: linked.get(id(f)) }))
+    .sort((a, b) => (a.book?.rank ?? Infinity) - (b.book?.rank ?? Infinity) || a.i - b.i)
+    .map(({ f, book }) => (book && f && typeof f === 'object' ? { ...f, book: book.name } : (f as T & { book?: string })));
 }
 
 /** Why a fetched document cannot be published, or null when it is fine. */
@@ -640,6 +661,7 @@ export async function buildData(o: BuildOptions): Promise<BuildResult> {
       try {
         data = pick(await getJson<unknown>(`${site}${path}`));
         if (!Array.isArray(data)) throw new Error('not a list');
+        if (name === 'files.json' && siteBooks) data = inBookOrder(data, siteBooks);
       } catch {
         data = previous ?? [];
       }

@@ -2,6 +2,7 @@
 // (navigation, book and detail labels) so both read the same.
 export const t = {
   appName: 'تحقیقاتِ حدیث',
+  bookTitle: 'غیر معتبر روایات کا فنی جائزہ',
   appTagline: 'غیر معتبر روایات اور علومِ حدیث کا تحقیقی سرچ انجن',
   nav: {
     home: 'صفحۂ اول',
@@ -15,7 +16,8 @@ export const t = {
     narrators: 'روات حدیث',
     menu: 'مینو',
     // The bottom bar's short labels, as on the website.
-    tab: { home: 'صفحۂ اول', search: 'تلاش', all: 'احادیث', saved: 'محفوظ', more: 'مزید' },
+    tab: { home: 'صفحۂ اول', search: 'تلاش', all: 'احادیث', narrators: 'روات', more: 'مزید' },
+    backToTop: 'اوپر جائیں',
   },
   heroDescription:
     'موضوع (من گھڑت) لا أصل له (بے اصل) واهي، اور مطروح احادیث کی تفصیلات کا سرچ انجن، کمپیوٹر اور موبائل دونوں کے لیے۔ اور اس کے علاوہ حدیث و علوم الحدیث کی دیگر تحقیقات۔',
@@ -30,13 +32,14 @@ export const t = {
     feedback: 'اپنی رائے یا تصحیح بھیجیں',
     feedbackLink:
       'https://docs.google.com/forms/d/e/1FAIpQLSfSPDvElyjVbHgQNT_tUNWmmZnpF37mQgqhOqPUSWcBI-hAJQ/viewform',
-    rights: 'تحقیقاتِ حدیث — تمام تحقیقات مفتی طارق امیر خان صاحب کی کتب سے۔',
+    rights: 'تحقیقاتِ حدیث · tehqeqatehadees.com — تمام تحقیقات مفتی طارق امیر خان صاحب کی کتب سے۔',
   },
   search: {
     title: 'روایت تلاش کریں',
     description:
       'نوٹ: تلاش کے لیے لکھے جانے والے کلمات میں سے کوئی کلمہ اگرچہ روایت کے عربی اور اردو متن میں نہ ہو، روایت کی تفصیلی تحقیق میں موجود ہو، پھر بھی وہ کلمہ مطلوبہ روایت تک رسائی میں مدد گار ہوگا۔',
     examples: 'مثلاً:',
+    noteToggle: 'تلاش کے بارے میں ایک نوٹ ▾',
     exampleWords: ['نماز', 'روزہ', 'درود', 'جمعہ'],
     relaxed: 'بالکل انہی الفاظ والی روایات کم ملیں، اس لیے ملتے جلتے الفاظ والی روایات بھی شامل کی گئی ہیں۔',
     noneHint: 'کم یا دوسرے الفاظ سے دوبارہ تلاش کریں، یا کتاب اور باب کا انتخاب ہٹا دیں۔',
@@ -59,14 +62,24 @@ export const t = {
   },
   allPage: {
     description: 'تحقیق شدہ تمام روایات۔ کسی روایت پر کلک کر کے اس کی مکمل تحقیق پڑھیں۔',
+    views: 'روایات دیکھنے کا انداز',
+    byChapter: 'ابواب کے لحاظ سے',
+    asList: 'تمام روایات ایک فہرست میں',
+  },
+  stats: {
+    label: 'اعداد و شمار',
+    narrations: 'روایات',
+    volumes: 'حصے',
+    books: 'کتب',
+    narrators: 'روات',
+    narratorsNote: 'جن پر ائمہ کا کلام نقل ہے',
+    centuries: 'ہجری صدیاں',
+    centuriesNote: 'جن میں ان کی وفات ہوئی',
   },
   books: {
     title: 'کتب خانہ',
     description: 'تحقیقاتِ حدیث کی مطبوعہ کتب اور ان کی روایات، ترتیب وار۔',
-    // The app has each book's narrations; the books themselves (PDF) are on the website.
-    downloadNote: 'مکمل کتابیں پڑھنے یا ڈاؤن لوڈ کرنے کے لیے ویب سائٹ کا کتب خانہ دیکھیں۔',
-    downloadLink: 'ویب سائٹ پر کتب خانہ کھولیں',
-    downloadOnline: 'اس کے لیے انٹرنیٹ درکار ہے۔',
+    volume: (n: string) => `حصہ ${n}`,
     series: 'غیر معتبر روایات کا فنی جائزہ',
     seriesNote: 'تحقیقی سلسلے کے تمام حصے، ترتیب وار۔',
     others: 'دیگر کتب',
@@ -80,6 +93,7 @@ export const t = {
     other: 'دیگر',
     chapter: (name: string) => `باب: ${name}`,
     samples: 'ہر باب سے ایک روایت',
+    samplesFew: 'چند ابواب سے روایات',
     samplesNote: (n: number) => `${fmt(n)} ابواب میں سے ہر ایک کی ایک روایت — ہر بار نئی۔`,
     samplesMore: 'اور دکھائیں',
     chooseBook: 'کتاب منتخب کریں',
@@ -98,7 +112,9 @@ export const t = {
     more: 'اور دکھائیں',
     all: 'تمام روات',
     searchLabel: 'راوی کا نام تلاش کریں',
-    searchPlaceholder: 'عربی یا اردو میں نام، کنیت یا نسبت لکھیں، مثلاً: أبان، ابو جعفر، بصری',
+    searchPlaceholder: 'عربی یا اردو میں نام، کنیت یا نسبت لکھیں',
+    letters: 'حروفِ تہجی',
+    related: (n: number) => (n === 1 ? 'اسی روایت کے دیگر روات' : 'انہی روایات کے دیگر روات'),
     count: (n: number) => `${fmt(n)} روات`,
     countOf: (n: number, total: number) => `${fmt(total)} میں سے ${fmt(n)} روات`,
     sort: 'ترتیب',
@@ -239,8 +255,12 @@ export const t = {
   },
   library: {
     title: 'کتب خانہ',
-    note: 'پی ڈی ایف کتابیں ویب سائٹ سے کھلتی ہیں، اس کے لیے انٹرنیٹ درکار ہے۔',
-    open: 'کھولیں',
+    description: 'تحقیقاتِ حدیث کی مطبوعہ کتب — آن لائن پڑھیں یا مکمل کتاب ڈاؤن لوڈ کریں۔',
+    note: 'کتابیں ویب سائٹ سے کھلتی اور ڈاؤن لوڈ ہوتی ہیں، اس کے لیے انٹرنیٹ درکار ہے۔ ہر کتاب کی روایات ایپ میں انٹرنیٹ کے بغیر بھی پڑھی جا سکتی ہیں۔',
+    narrations: 'روایات ایپ میں پڑھیں',
+    count: (n: number) => `کتب (${fmt(n)})`,
+    open: 'دیکھیں',
+    inApp: 'روایات',
     empty: 'کتب خانے کی فہرست ابھی نہیں آئی۔ انٹرنیٹ سے جڑ کر تازہ کریں۔',
   },
   about: {

@@ -2,6 +2,8 @@ import { createElement, useEffect, useMemo, useRef } from 'react';
 
 import { sanitizeHadithHtml, splitForHighlight } from '@tehqeqat/core';
 
+const FOOTNOTE_MARK = /^\s*\[\s*[0-9۰-۹٠-٩]+\s*\]\s*$/;
+
 /**
  * Stored hadith HTML, sanitised, with search words marked. Highlighting walks
  * the text nodes after render and wraps matches in <mark>, using the core's
@@ -20,6 +22,17 @@ export function Html({
 }) {
   const ref = useRef<HTMLElement | null>(null);
   const safe = useMemo(() => sanitizeHadithHtml(html), [html]);
+
+  // Footnote marks («[1]», a span of their own) are made small and raised in
+  // the text and coloured in the notes, as on the website; a tap on one in
+  // the text opens «حوالہ جات» at its note (ReferencesBox).
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    for (const el of root.querySelectorAll('span, sup, a')) {
+      if (!el.firstElementChild && FOOTNOTE_MARK.test(el.textContent ?? '')) el.classList.add('fn-mark');
+    }
+  }, [safe]);
 
   useEffect(() => {
     const root = ref.current;

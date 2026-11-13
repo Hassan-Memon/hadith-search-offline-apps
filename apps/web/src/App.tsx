@@ -6,7 +6,7 @@ import { Logo, Shell } from './components/Shell';
 import { BASE } from './config';
 import { HadithPage } from './pages/Hadith';
 import { AllPage, BookPage, BooksPage, ChapterPage, ChaptersPage } from './pages/Lists';
-import { LibraryPage, MorePage } from './pages/More';
+import { MorePage } from './pages/More';
 import { SavedPage } from './pages/Saved';
 import { HomePage, SearchPage } from './pages/Search';
 import { t } from './strings';
@@ -146,7 +146,8 @@ export function App() {
           />
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/more" element={<MorePage />} />
-          <Route path="/library" element={<LibraryPage />} />
+          {/* «کتب خانہ» is /books, as on the website (1.4); /library was its old place. */}
+          <Route path="/library" element={<Navigate to="/books" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Shell>

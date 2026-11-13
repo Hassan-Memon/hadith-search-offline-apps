@@ -28,7 +28,8 @@ export type IconName =
   | 'mail'
   | 'message'
   | 'shuffle'
-  | 'arrow';
+  | 'arrow'
+  | 'up';
 
 const PATHS: Record<IconName, string> = {
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm9 16-4.3-4.3',
@@ -60,6 +61,7 @@ const PATHS: Record<IconName, string> = {
   message: 'M4 4h16v12H8l-4 4V4zM8 9h8M8 12h5',
   shuffle: 'M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5',
   arrow: 'M19 12H5m6-6-6 6 6 6',
+  up: 'M12 19V5m-6 6 6-6 6 6',
 };
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {

@@ -10,16 +10,18 @@ import {
   groupBooks,
   listBooks,
   listChapters,
+  listFiles,
   listHadith,
 } from '@tehqeqat/core';
 
 import { bookPath, chapterPath, HadithCard, HadithList } from '../components/HadithCard';
 import { Icon } from '../components/Icon';
 import { PageTitle } from '../components/Shell';
-import { PAGE_SIZE, WEBSITE } from '../config';
+import { PAGE_SIZE } from '../config';
 import { db } from '../db/client';
 import { useChapterNames, useQuery } from '../hooks';
 import { fmt, fmtDay, t } from '../strings';
+import { useApp } from '../sync/store';
 
 function PagedList({ book, chapter }: { book?: string; chapter?: string }) {
   const [pages, setPages] = useState(1);
@@ -43,22 +45,26 @@ function PagedList({ book, chapter }: { book?: string; chapter?: string }) {
 
 const SAMPLES_SHOWN = 6;
 
-/** «ہر باب سے ایک روایت»: a new pick every hour, like the website. */
-function ChapterSamples() {
+/**
+ * «ہر باب سے ایک روایت»: a new pick every hour, like the website. On the
+ * home page (`few`) it is «چند ابواب سے روایات»: six (three on a phone) and a
+ * link to the chapters instead of «اور دکھائیں». Prefaces are never picked.
+ */
+export function ChapterSamples({ few = false }: { few?: boolean }) {
   const [seed, setSeed] = useState(() => Math.floor(Date.now() / 3_600_000));
   const [shown, setShown] = useState(SAMPLES_SHOWN);
   const samples = useQuery(() => chapterSamples(db, seed), [seed]);
   const items = samples.data ?? [];
   if (items.length === 0) return null;
   return (
-    <section className="section">
+    <section className={`section ${few ? 'samples--few' : ''}`}>
       <div className="section__head">
-        <h2 className="section-title">{t.chapters.samples}</h2>
+        <h2 className="section-title">{few ? t.chapters.samplesFew : t.chapters.samples}</h2>
         <Link to="/chapters" className="link-strong">
           {t.chapters.allChapters} ←
         </Link>
       </div>
-      <p className="muted small">{t.chapters.samplesNote(items.length)}</p>
+      {!few && <p className="muted small">{t.chapters.samplesNote(items.length)}</p>}
       <ol className="hadith-list">
         {items.slice(0, shown).map((item) => (
           <li key={item.id}>
@@ -66,50 +72,113 @@ function ChapterSamples() {
           </li>
         ))}
       </ol>
-      <button
-        type="button"
-        className="btn btn--wide"
-        onClick={() => {
-          if (shown < items.length) setShown((n) => n + SAMPLES_SHOWN);
-          else {
-            setSeed((s) => s + 1);
-            setShown(SAMPLES_SHOWN);
-          }
-        }}
-      >
-        {t.chapters.samplesMore}
-      </button>
+      {!few && (
+        <button
+          type="button"
+          className="btn btn--wide"
+          onClick={() => {
+            if (shown < items.length) setShown((n) => n + SAMPLES_SHOWN);
+            else {
+              setSeed((s) => s + 1);
+              setShown(SAMPLES_SHOWN);
+            }
+          }}
+        >
+          {t.chapters.samplesMore}
+        </button>
+      )}
     </section>
   );
 }
 
-export function AllPage() {
-  const books = useQuery(() => listBooks(db), []);
-  const series = books.data ? groupBooks(books.data).series : [];
+/**
+ * «تمام احادیث» has two ways to read (the website since 13 Nov 2026): by
+ * chapter (/chapters) or everything in one list (/all). Both pages show this
+ * switch at the top, and both light «تمام احادیث» in the menus.
+ */
+function HadithViewSwitch({ current }: { current: 'chapters' | 'list' }) {
+  const options = [
+    { key: 'chapters', to: '/chapters', label: t.allPage.byChapter, icon: 'grid' },
+    { key: 'list', to: '/all', label: t.allPage.asList, icon: 'list' },
+  ] as const;
   return (
-    <div className="page">
-      <PageTitle title={t.nav.all} sub={t.allPage.description} />
+    <nav aria-label={t.allPage.views} className="view-switch">
+      <ul>
+        {options.map((o) => (
+          <li key={o.key}>
+            <Link to={o.to} aria-current={o.key === current ? 'page' : undefined}>
+              <Icon name={o.icon} />
+              {o.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/**
+ * «کتاب منتخب کریں», as on the website's /all-hadees since 13 Nov 2026: a card
+ * per part of the series with its number in a square box, its name and its
+ * count, then the other books as rows.
+ */
+function BookChooser() {
+  const books = useQuery(() => listBooks(db), []);
+  if (!books.data) return null;
+  const { series, others } = groupBooks(books.data);
+  if (series.length === 0 && others.length === 0) return null;
+  const sameVolume = new Map<number, number>();
+  for (const s of series) sameVolume.set(s.volume, (sameVolume.get(s.volume) ?? 0) + 1);
+  return (
+    <nav aria-labelledby="book-chooser" className="section">
+      <h2 id="book-chooser" className="section-title">
+        {t.chapters.chooseBook}
+      </h2>
       {series.length > 0 && (
-        <section className="section">
-          <h2 className="section-title">{t.chapters.chooseBook}</h2>
-          <p className="muted small">{t.books.series}</p>
-          <ul className="volume-pills" aria-label={t.books.series}>
+        <>
+          <h3 className="subsection-title">{t.books.series}</h3>
+          <ul className="volumes">
             {series.map((s) => (
               <li key={s.book}>
-                <Link to={bookPath(s.book)} className="volume-pill">
-                  <span className="volume-pill__label">{s.label}</span>
-                  <span className="volume-pill__count">{fmt(s.count)}</span>
+                <Link to={bookPath(s.book)} className="volume" title={s.book}>
+                  <span className="volume__no">{fmt(s.volume)}</span>
+                  <span className="volume__label">{s.label}</span>
+                  {(sameVolume.get(s.volume) ?? 0) > 1 && <span className="volume__full">{s.book}</span>}
+                  <span className="volume__count">{t.list.count(s.count)}</span>
                 </Link>
               </li>
             ))}
-            <li>
-              <Link to="/books" className="volume-pill volume-pill--more">
-                {t.books.others} ←
-              </Link>
-            </li>
           </ul>
-        </section>
+        </>
       )}
+      {others.length > 0 && (
+        <>
+          <h3 className="subsection-title">{t.books.others}</h3>
+          <ul className="others">
+            {others.map((b) => (
+              <li key={b.book}>
+                <Link to={bookPath(b.book)} className="card other">
+                  <span className="urdu">{b.book}</span>
+                  <span className="muted">{t.list.count(b.count)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </nav>
+  );
+}
+
+export function AllPage() {
+  useEffect(() => {
+    document.title = `${t.nav.all} | ${t.appName}`;
+  }, []);
+  return (
+    <div className="page">
+      <HadithViewSwitch current="list" />
+      <PageTitle title={t.nav.all} sub={t.allPage.description} />
+      <BookChooser />
       <ChapterSamples />
       <section className="section">
         <h2 className="section-title">{t.nav.all}</h2>
@@ -130,7 +199,7 @@ export function BookPage() {
     <div className="page">
       <nav className="crumbs">
         <Link to="/">{t.hadith.home}</Link>
-        <Link to="/books">{t.books.title}</Link>
+        <Link to="/all">{t.nav.all}</Link>
       </nav>
       <PageTitle
         title={name}
@@ -142,51 +211,66 @@ export function BookPage() {
   );
 }
 
+/**
+ * «کتب خانہ»: the printed books themselves, as on the website's /books (a
+ * cover, the name and «دیکھیں»). The books open from the website; each book's
+ * narrations are in the app under «تمام احادیث».
+ */
 export function BooksPage() {
+  const files = useQuery(() => listFiles(db), []);
   const books = useQuery(() => listBooks(db), []);
-  if (!books.data) return null;
-  const { series, others } = groupBooks(books.data);
-  const sameVolume = new Map<number, number>();
-  for (const s of series) sameVolume.set(s.volume, (sameVolume.get(s.volume) ?? 0) + 1);
+  const { online } = useApp();
+  // A file the registry links to a book carries the book's name: its narrations are in the app.
+  const bookNames = new Set((books.data ?? []).map((b) => b.book));
+  useEffect(() => {
+    document.title = `${t.library.title} | ${t.appName}`;
+  }, []);
+  const list = files.data ?? [];
   return (
     <div className="page">
-      <PageTitle title={t.books.title} sub={t.books.description} />
+      <PageTitle title={t.library.title} sub={t.library.description} />
       <aside className="download-note">
         <Icon name="download" />
         <p>
-          {t.books.downloadNote}{' '}
-          <a href={`${WEBSITE}/books`} target="_blank" rel="noreferrer" className="link-strong">
-            {t.books.downloadLink} ←
-          </a>
-          <span className="muted small block">{t.books.downloadOnline}</span>
+          {t.library.note}{' '}
+          <Link to="/all" className="link-strong">
+            {t.library.narrations} ←
+          </Link>
         </p>
       </aside>
-      <section className="section">
-        <h2 className="section-title">{t.books.series}</h2>
-        <p className="muted">{t.books.seriesNote}</p>
-        <ul className="volumes">
-          {series.map((s) => (
-            <li key={s.book}>
-              <Link to={bookPath(s.book)} className="volume">
-                <span className="volume__no">{fmt(s.volume)}</span>
-                <span className="volume__label">{s.label}</span>
-                {(sameVolume.get(s.volume) ?? 0) > 1 && <span className="volume__full">{s.book}</span>}
-                <span className="volume__count">{t.list.count(s.count)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-      {others.length > 0 && (
+      {files.data && list.length === 0 && <p className="empty">{t.library.empty}</p>}
+      {list.length > 0 && (
         <section className="section">
-          <h2 className="section-title">{t.books.others}</h2>
-          <ul className="others">
-            {others.map((b) => (
-              <li key={b.book}>
-                <Link to={bookPath(b.book)} className="card other">
-                  <span className="urdu">{b.book}</span>
-                  <span className="muted">{t.list.count(b.count)}</span>
-                </Link>
+          <h2 className="section-title section-title--rule">{t.library.count(list.length)}</h2>
+          <ul className="library">
+            {list.map((f) => (
+              <li key={f.id} className="card book">
+                {f.image_url && online && (
+                  <img
+                    className="book__cover"
+                    src={f.image_url}
+                    alt=""
+                    loading="lazy"
+                    width="120"
+                    height="170"
+                    onError={(e) => e.currentTarget.remove()}
+                  />
+                )}
+                <div className="book__body">
+                  <span className="book__name urdu">{f.name.replace(/\.pdf$/i, '')}</span>
+                  <span className="muted small">PDF</span>
+                  <span className="book__actions">
+                    <a className="btn btn--primary" href={f.url} target="_blank" rel="noreferrer">
+                      <Icon name="book-open" />
+                      {t.library.open}
+                    </a>
+                    {bookNames.has(f.name) && (
+                      <Link to={bookPath(f.name)} className="btn">
+                        {t.library.inApp}
+                      </Link>
+                    )}
+                  </span>
+                </div>
               </li>
             ))}
           </ul>
@@ -215,6 +299,7 @@ export function ChaptersPage() {
   }, []);
   return (
     <div className="page">
+      <HadithViewSwitch current="chapters" />
       <PageTitle
         title={t.chapters.title}
         sub={t.chapters.intro}
@@ -258,6 +343,7 @@ export function ChapterPage() {
     <div className="page">
       <nav className="crumbs">
         <Link to="/">{t.hadith.home}</Link>
+        <Link to="/all">{t.nav.all}</Link>
         <Link to="/chapters">{t.chapters.title}</Link>
         {chapter.data.parent && <span>{chapter.data.parent}</span>}
       </nav>

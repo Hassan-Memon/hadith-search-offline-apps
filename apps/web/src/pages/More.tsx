@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { Link } from 'react-router';
 
-import { getSetting, listFiles } from '@tehqeqat/core';
+import { getSetting } from '@tehqeqat/core';
 
 import { Icon } from '../components/Icon';
 import { PageTitle } from '../components/Shell';
@@ -48,6 +48,26 @@ export function MorePage() {
   return (
     <div className="page more">
       <PageTitle title={t.more.title} />
+
+      {/* The pages that are not in the bottom bar, as the website's side menu. */}
+      <nav className="card panel links" aria-label={t.nav.menu}>
+        <Link to="/saved">
+          <Icon name="bookmark" />
+          {t.nav.saved}
+        </Link>
+        <Link to="/books">
+          <Icon name="library" />
+          {t.nav.books}
+        </Link>
+        <Link to="/chapters">
+          <Icon name="grid" />
+          {t.nav.chapters}
+        </Link>
+        <Link to="/about">
+          <Icon name="info" />
+          {t.nav.about}
+        </Link>
+      </nav>
 
       <section className="card panel">
         <h2>{t.more.syncTitle}</h2>
@@ -152,14 +172,6 @@ export function MorePage() {
       </section>
 
       <section className="card panel links">
-        <Link to="/about">
-          <Icon name="info" />
-          {t.nav.about}
-        </Link>
-        <Link to="/library">
-          <Icon name="book" />
-          {t.more.library}
-        </Link>
         <a href={WEBSITE} target="_blank" rel="noreferrer">
           <Icon name="globe" />
           {t.more.website}
@@ -195,26 +207,6 @@ export function MorePage() {
           </button>
         )}
       </section>
-    </div>
-  );
-}
-
-export function LibraryPage() {
-  const files = useQuery(() => listFiles(db), []);
-  return (
-    <div className="page">
-      <PageTitle title={t.library.title} sub={t.library.note} />
-      {files.data && files.data.length === 0 && <p className="empty">{t.library.empty}</p>}
-      <ul className="files">
-        {files.data?.map((f) => (
-          <li key={f.id} className="card file">
-            <span className="urdu">{f.name.replace(/\.pdf$/i, '')}</span>
-            <a className="btn" href={f.url} target="_blank" rel="noreferrer">
-              {t.library.open}
-            </a>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

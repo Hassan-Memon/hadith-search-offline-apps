@@ -9,6 +9,7 @@ import sk from '@assets/images/about/taqriz-saleemullah-khan.jpg';
 
 import { Html } from '../components/Html';
 import { Volume2Preface } from './about/Volume2Preface';
+import { TAWZIH_TITLE } from './about/volume2Text';
 import { Icon } from '../components/Icon';
 import { db } from '../db/client';
 import { useQuery } from '../hooks';
@@ -105,6 +106,18 @@ export function AboutPage() {
                     <a href={`#m-${i + 1}`}>
                       <span className="toc__n">{fmt(i + 1)}</span>
                       {s.heading?.trim() ? stripHtml(s.heading) : t.about.opening}
+                    </a>
+                  </li>
+                ))}
+                {/* Part 2 is in the contents too (the website since 13 Nov 2026). */}
+                {[
+                  ['#muqaddima-2', t.about.volume2Preface],
+                  ['#tawzih', TAWZIH_TITLE],
+                ].map(([href, label], j) => (
+                  <li key={href}>
+                    <a href={href}>
+                      <span className="toc__n">{fmt(sections.length + j + 1)}</span>
+                      {label}
                     </a>
                   </li>
                 ))}

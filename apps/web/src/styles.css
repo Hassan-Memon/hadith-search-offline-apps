@@ -129,7 +129,10 @@ h1, h2, h3 { line-height: 1.8; text-wrap: balance; margin: 0; font-weight: 700; 
   padding: 6px var(--gutter);
 }
 .brand { display: flex; align-items: center; flex-shrink: 0; }
-.brand img { display: block; width: auto; height: 46px; }
+/* The website's lockup: the book's name in calligraphy, the site's name under it. */
+.logo { position: relative; display: inline-flex; flex-direction: column; align-items: center; height: 50px; }
+.logo img { display: block; width: auto; height: 40px; }
+.logo__name { position: absolute; bottom: -4px; font-size: 0.7rem; line-height: 1; white-space: nowrap; color: rgb(255 255 255 / 0.7); }
 .brand:hover { text-decoration: none; }
 .topnav { display: none; gap: 2px; margin-inline: auto; }
 .topnav a {
@@ -223,6 +226,18 @@ h1, h2, h3 { line-height: 1.8; text-wrap: balance; margin: 0; font-weight: 700; 
   line-height: 2.1;
 }
 .announce p { margin: 0; flex: 1; min-width: 0; }
+/* The website's notice: one line that scrolls, its first words shown at once,
+   a 3 s wait, then a loop with no gap; a hover or a held finger pauses it.
+   With reduced motion it stands still and wraps. */
+.ticker { flex: 1; min-width: 0; overflow: hidden; }
+.ticker__track { display: flex; width: max-content; margin: 0; white-space: nowrap; animation: ticker 40s linear 3s infinite; }
+.ticker__track > span { padding-inline-end: 4rem; }
+.ticker:hover .ticker__track, .ticker:active .ticker__track { animation-play-state: paused; }
+@keyframes ticker { to { transform: translateX(50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .ticker__track { animation: none; white-space: normal; width: auto; }
+  .ticker__track > span + span { display: none; }
+}
 .announce--site { background: var(--site-banner); color: #1f2937; }
 .announce--site .icon-btn { color: #1f2937; }
 
@@ -248,7 +263,9 @@ h1, h2, h3 { line-height: 1.8; text-wrap: balance; margin: 0; font-weight: 700; 
   background: linear-gradient(180deg, var(--accent-soft), color-mix(in srgb, var(--accent-soft) 35%, var(--surface)));
 }
 .page-title h1 { font-size: clamp(1.5rem, 4.5vw, 2rem); }
-.page-title > p { margin: 0; color: var(--ink-soft); line-height: 2.3; text-wrap: pretty; }
+.page-title > p, .page-title__sub { margin: 0; color: var(--ink-soft); line-height: 2.3; text-wrap: pretty; }
+.search-note summary { cursor: pointer; color: var(--accent-deep); list-style: none; }
+.search-note summary::-webkit-details-marker { display: none; }
 .page-title__note { color: var(--muted) !important; font-size: 0.9rem; }
 .page-title .searchbox { margin-top: 8px; text-align: start; }
 .page-title--plain { background: none; border: 0; padding: 12px 0 0; }
@@ -754,6 +771,23 @@ h1, h2, h3 { line-height: 1.8; text-wrap: balance; margin: 0; font-weight: 700; 
 .prose table { display: block; overflow-x: auto; max-width: 100%; }
 .refs { display: flex; flex-direction: column; gap: 10px; }
 .refs .card { padding: 12px 18px; }
+/* «حوالہ جات», closed until asked for. */
+.refs-box { scroll-margin-top: 84px; }
+.refs-box > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
+.refs-box > summary::-webkit-details-marker { display: none; }
+.refs-box > summary h2 { flex: 1; }
+.refs-box > summary::after { content: '⌄'; color: var(--accent); font-family: system-ui; font-size: 1.3rem; transition: transform 0.15s; }
+.refs-box[open] > summary::after { transform: rotate(180deg); }
+.refs-box > .card { margin-top: 10px; }
+.note--hit { background: var(--mark); border-radius: 6px; transition: background 0.6s; }
+/* Footnote marks: small and raised in the text, set in Naskh (Nastaliq's
+   digits lean and crowd at this size), coloured in the notes. */
+.fn-mark { font-family: var(--arabic) !important; color: var(--accent); white-space: nowrap; }
+.sections .fn-mark { font-size: 0.6em !important; line-height: 0; vertical-align: 0.75em; margin-inline: 0.1em; cursor: pointer; }
+.refs-box .fn-mark { font-size: 0.85em !important; font-weight: 700; margin-inline-end: 0.3em; }
+/* A symbol-font honorific is for the eye; its words follow for screen
+   readers, and that is what a copy takes. */
+[data-symbol] { user-select: none; -webkit-user-select: none; }
 .study-link { margin: 0; padding: 0 16px 8px; }
 .related { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .related li + li { border-top: 1px solid var(--line-soft); }
@@ -900,8 +934,91 @@ fieldset label { display: flex; gap: 8px; align-items: center; min-height: 40px;
 .progress__bar { height: 10px; background: var(--line); border-radius: 999px; overflow: hidden; }
 .progress__bar span { display: block; height: 100%; background: var(--accent-strong); border-radius: 999px; transition: width 0.2s; }
 
+/* ---------- 13 Nov: the website's newer pieces ---------- */
+/* «اوپر جائیں» */
+.back-to-top {
+  position: fixed;
+  inset-inline-end: 16px;
+  bottom: calc(var(--tabbar-h) + 14px + env(safe-area-inset-bottom, 0px));
+  z-index: 29;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--accent-200);
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  color: var(--accent-deep);
+  box-shadow: var(--shadow-lift);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.back-to-top--shown { opacity: 1; pointer-events: auto; }
+@media (min-width: 900px) { .back-to-top { bottom: 24px; inset-inline-end: 24px; } }
+
+/* «ابواب کے لحاظ سے | تمام روایات ایک فہرست میں» */
+.view-switch { display: flex; justify-content: center; }
+.view-switch ul { list-style: none; margin: 0; padding: 4px; display: inline-flex; width: 100%; max-width: 36rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.view-switch li { flex: 1; }
+.view-switch a { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: var(--radius-sm); color: var(--muted); font-weight: 700; font-size: 0.95rem; text-align: center; line-height: 1.8; }
+.view-switch a:hover { text-decoration: none; background: var(--accent-soft); color: var(--accent-deep); }
+.view-switch a[aria-current='page'] { background: var(--accent); color: #fff; }
+.view-switch .icon { width: 18px; height: 18px; }
+.subsection-title { font-size: 1.1rem; color: var(--ink-soft); margin-top: 4px; }
+@media (max-width: 620px) { .volumes { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1000px) { .page .volumes { grid-template-columns: repeat(5, 1fr); } }
+
+/* Number tiles (home, روات حدیث) */
+.stat-tiles { list-style: none; margin: 0 auto; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; width: 100%; max-width: 48rem; }
+.stat-tile { display: flex; flex-direction: column; align-items: center; gap: 0; padding: 14px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+.stat-tile__value { font-family: system-ui, sans-serif; font-weight: 700; font-size: 1.6rem; color: var(--accent-deep); line-height: 1.6; }
+.stat-tile__label { font-weight: 700; }
+.stat-tile__note { color: var(--muted); font-size: 0.8rem; line-height: 1.9; }
+
+/* Home: the band under the picture and the sections after the cards. */
+.home__band { background: var(--surface); padding: 24px var(--gutter); border-bottom: 1px solid var(--line); }
+.home__band .stat-tiles { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.home__band .stat-tile { padding: 10px 4px; box-shadow: none; }
+.home__band .stat-tile__value { font-size: 1.35rem; }
+.home__more { padding: 40px var(--gutter); }
+.home__more > .section { max-width: 1040px; margin: 0 auto; }
+.home__more--white { background: var(--surface); }
+.home__more--white .hadith-card { background: var(--bg); }
+@media (max-width: 699px) { .samples--few .hadith-list > li:nth-child(n + 4) { display: none; } }
+.examples--hero { margin-top: 2px; }
+.examples--hero .examples__label { color: rgb(255 255 255 / 0.85); }
+.examples--hero .example { min-width: 0; height: 40px; padding: 0 16px; background: rgb(255 255 255 / 0.12); border-color: rgb(255 255 255 / 0.25); color: #fff; box-shadow: none; }
+.examples--hero .example:hover { background: rgb(255 255 255 / 0.22); }
+@media (min-width: 900px) { .examples--hero { justify-content: center; } }
+
+/* روات حدیث in name order: a strip of first letters, then a group per letter. */
+.letters { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+/* On a wide screen the strip stays in view; on a phone it would hide the list. */
+@media (min-width: 700px) { .letters { position: sticky; top: 72px; z-index: 5; } }
+.letters a { display: grid; place-items: center; min-width: 34px; height: 34px; border-radius: 8px; color: var(--accent-deep); font-family: var(--arabic); font-size: 1.1rem; }
+.letters a:hover { background: var(--accent-soft); text-decoration: none; }
+.letter-group { display: flex; flex-direction: column; gap: 10px; }
+.letter-group__letter { scroll-margin-top: 140px; font-family: var(--arabic); font-size: 1.5rem; color: var(--accent-deep); border-bottom: 1px solid var(--line); padding-bottom: 2px; }
+
+/* کتب خانہ: the printed books, a cover and «دیکھیں». */
+.library { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.book { display: flex; gap: 14px; padding: 14px; align-items: stretch; }
+.book__cover { width: 84px; height: 118px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.18); flex-shrink: 0; background: var(--line-soft); }
+.book__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.book__name { font-weight: 700; line-height: 2.1; }
+.book__actions { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Search on a phone: the two filters side by side. */
+@media (max-width: 699px) {
+  .filters { flex-direction: row; align-items: stretch; }
+  .filters label { flex-direction: column; align-items: stretch; gap: 2px; max-width: none; }
+  .filters label > span { text-align: start; font-size: 0.85rem; }
+}
+
 @media print {
-  .topbar, .tabbar, .announce, .no-print, .crumbs, .site-footer { display: none !important; }
+  .topbar, .tabbar, .announce, .no-print, .crumbs, .site-footer, .back-to-top, .view-switch { display: none !important; }
   body { background: #fff; color: #000; }
   .shell { padding: 0; }
   .main { padding: 0; }
