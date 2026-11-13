@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-13 — 1.3.1: where to download the books
+
+- **کتب خانہ** says where the books themselves are: the app lists each book's
+  narrations (as «تمام احادیث» does), and a note links to the website's کتب
+  خانہ to read or download the whole book (needs internet).
+
 ## 2026-11-12 — 1.3.0: the website's narrators and search, and its look
 
 Brings the website's updates of 8–11 November into the app, and dresses the

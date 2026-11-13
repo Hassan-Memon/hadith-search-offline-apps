@@ -16,7 +16,7 @@ import {
 import { bookPath, chapterPath, HadithCard, HadithList } from '../components/HadithCard';
 import { Icon } from '../components/Icon';
 import { PageTitle } from '../components/Shell';
-import { PAGE_SIZE } from '../config';
+import { PAGE_SIZE, WEBSITE } from '../config';
 import { db } from '../db/client';
 import { useChapterNames, useQuery } from '../hooks';
 import { fmt, fmtDay, t } from '../strings';
@@ -151,6 +151,16 @@ export function BooksPage() {
   return (
     <div className="page">
       <PageTitle title={t.books.title} sub={t.books.description} />
+      <aside className="download-note">
+        <Icon name="download" />
+        <p>
+          {t.books.downloadNote}{' '}
+          <a href={`${WEBSITE}/books`} target="_blank" rel="noreferrer" className="link-strong">
+            {t.books.downloadLink} ←
+          </a>
+          <span className="muted small block">{t.books.downloadOnline}</span>
+        </p>
+      </aside>
       <section className="section">
         <h2 className="section-title">{t.books.series}</h2>
         <p className="muted">{t.books.seriesNote}</p>
