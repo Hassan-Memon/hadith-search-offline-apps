@@ -1,4 +1,4 @@
-import { type CSSProperties, type FormEvent, useEffect, useState } from 'react';
+import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { Link, useNavigate, useSearchParams } from 'react-router';
 
@@ -8,6 +8,7 @@ import {
   listChapters,
   listHadith,
   listHistory,
+  listNarrators,
   searchHadith,
   type SearchHit,
   type SearchResult,
@@ -16,12 +17,14 @@ import {
 import heroImage from '@assets/images/hero.webp';
 
 import { HadithCard, HadithList } from '../components/HadithCard';
+import { NarratorCard, shuffled, StatTiles } from '../components/Narrator';
 import { Icon, type IconName } from '../components/Icon';
 import { PageTitle, SiteFooter } from '../components/Shell';
 import { PAGE_SIZE } from '../config';
 import { db } from '../db/client';
 import { useChapterNames, useQuery } from '../hooks';
 import { t } from '../strings';
+import { ChapterSamples } from './Lists';
 import { useApp } from '../sync/store';
 
 /** Search URL that keeps the current filters. */
@@ -88,12 +91,50 @@ const CARDS: { to: string; icon: IconName; label: string; text: string }[] = [
   { to: '/about', icon: 'info', label: t.nav.about, text: t.home.cards.about },
 ];
 
+/** «چند روات» on the home page: as on /narrators, with a link to them all. */
+function HomeNarrators() {
+  const all = useQuery(() => listNarrators(db), []);
+  const [round, setRound] = useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const few = useMemo(() => shuffled(all.data ?? [], 6), [all.data, round]);
+  if (few.length === 0) return null;
+  return (
+    <section className="section">
+      <div className="section__head">
+        <h2 className="section-title">{t.narrators.suggestions}</h2>
+        <Link to="/narrators" className="link-strong">
+          {t.narrators.all} ←
+        </Link>
+      </div>
+      <ul className="narrator-grid">
+        {few.map((n) => (
+          <li key={n.slug}>
+            <NarratorCard n={n} excerpt={false} />
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="btn btn--wide" onClick={() => setRound((r) => r + 1)}>
+        <Icon name="shuffle" />
+        {t.narrators.more}
+      </button>
+    </section>
+  );
+}
+
 export function HomePage() {
   const { hadithCount } = useApp();
   const history = useQuery(() => listHistory(db, 5), []);
   const books = useQuery(() => listBooks(db), []);
+  const narrators = useQuery(() => listNarrators(db), []);
   // Two stored spellings of one volume are one volume.
   const volumes = books.data ? new Set(groupBooks(books.data).series.map((s) => s.volume)).size : 0;
+  // What the site holds, in four numbers, as on the website's home page.
+  const tiles = [
+    ...(hadithCount > 0 ? [{ value: hadithCount, label: t.stats.narrations }] : []),
+    ...(volumes > 0 ? [{ value: volumes, label: t.stats.volumes }] : []),
+    ...(books.data?.length ? [{ value: books.data.length, label: t.stats.books }] : []),
+    ...(narrators.data?.length ? [{ value: narrators.data.length, label: t.stats.narrators }] : []),
+  ];
   return (
     <div className="home">
       <section className="hero" style={{ '--hero-image': `url(${heroImage})` } as CSSProperties}>
@@ -101,12 +142,22 @@ export function HomePage() {
           <h1>{t.appTagline}</h1>
           <p className="hero__text">{t.heroDescription}</p>
           <SearchBox hero />
-          {hadithCount > 0 && (
-            <p className="hero__meta">
-              {t.home.stats(hadithCount, volumes)} · {t.search.hint}
-            </p>
-          )}
+          <ul className="examples examples--hero" aria-label={t.search.examples}>
+            <li className="examples__label">{t.search.examples}</li>
+            {t.search.exampleWords.map((word) => (
+              <li key={word}>
+                <Link to={searchHref(word, '', '')} className="example">
+                  {word}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="hero__meta">{t.search.hint}</p>
         </div>
+      </section>
+
+      <section className="home__band">
+        <StatTiles tiles={tiles} label={t.stats.label} />
       </section>
 
       <section className="explore">
@@ -128,11 +179,19 @@ export function HomePage() {
         </ul>
       </section>
 
+      <div className="home__more home__more--white">
+        <ChapterSamples few />
+      </div>
+      <div className="home__more">
+        <HomeNarrators />
+      </div>
       {history.data && history.data.length > 0 && (
-        <section className="section home__recent">
-          <h2 className="section-title">{t.home.recent}</h2>
-          <HadithList items={history.data} />
-        </section>
+        <div className="home__more home__more--white">
+          <section className="section">
+            <h2 className="section-title">{t.home.recent}</h2>
+            <HadithList items={history.data} />
+          </section>
+        </div>
       )}
       <SiteFooter />
     </div>
@@ -182,6 +241,19 @@ function Filters({ q, book, chapter }: { q: string; book: string; chapter: strin
   );
 }
 
+/** A phone-sized screen, where the website folds the search note once there are results. */
+function useNarrow(): boolean {
+  const query = '(max-width: 699px)';
+  const [narrow, setNarrow] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setNarrow(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return narrow;
+}
+
 export function SearchPage() {
   const [params] = useSearchParams();
   const q = params.get('q') ?? '';
@@ -201,12 +273,25 @@ export function SearchPage() {
   const chapterNames = useChapterNames();
   const hits: SearchHit[] = result.data?.hits ?? [];
   const shown = (q.trim() || filtered) && result.data;
+  const narrow = useNarrow();
   useEffect(() => {
     document.title = `${q.trim() ? `${q.trim()} | ` : ''}${t.search.title} | ${t.appName}`;
   }, [q]);
   return (
     <div className="page">
-      <PageTitle title={t.search.title} sub={t.search.description}>
+      <PageTitle
+        title={t.search.title}
+        sub={
+          narrow && shown ? (
+            <details className="search-note">
+              <summary>{t.search.noteToggle}</summary>
+              {t.search.description}
+            </details>
+          ) : (
+            t.search.description
+          )
+        }
+      >
         <SearchBox initial={q} book={book} chapter={chapter} autoFocus={!q && !filtered} />
         <Filters q={q} book={book} chapter={chapter} />
         {!q.trim() && (

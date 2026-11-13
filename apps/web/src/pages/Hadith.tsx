@@ -19,10 +19,12 @@ import {
 import { bookPath, chapterPath, hadithPath, narratorPath } from '../components/HadithCard';
 import { Html } from '../components/Html';
 import { Icon } from '../components/Icon';
+import { NarratorName } from '../components/Narrator';
 import {
   Contents,
   type ReaderAction,
   ReaderToolbar,
+  ReferencesBox,
   ResearchSections,
   SectionTitle,
   type StudyMark,
@@ -33,17 +35,6 @@ import { db } from '../db/client';
 import { useQuery } from '../hooks';
 import { fmtDay, t } from '../strings';
 import { useApp } from '../sync/store';
-
-/** A narrator's name as the book's «فہرستِ رُوات» writes it: in Arabic, Urdu until he has one. */
-export function NarratorName({ n }: { n: { name: string; arabic_name?: string | null } }) {
-  return n.arabic_name ? (
-    <span lang="ar" className="narrator-arabic">
-      {n.arabic_name}
-    </span>
-  ) : (
-    <span>{n.name}</span>
-  );
-}
 
 export function HadithPage() {
   const slug = decodeURIComponent(useParams().slug ?? '');
@@ -219,12 +210,7 @@ export function HadithPage() {
       <SectionTitle>{t.hadith.details}</SectionTitle>
       <ResearchSections sections={sections} state={state} q={q} studies={studyAt} />
 
-      {hadith.references_html && (
-        <section className="refs">
-          <SectionTitle>{t.hadith.references}</SectionTitle>
-          <Html html={hadith.references_html} className="urdu prose prose--small card" />
-        </section>
-      )}
+      {hadith.references_html && <ReferencesBox html={hadith.references_html} />}
 
       {narrators.data && narrators.data.length > 0 && (
         <section className="section no-print">

@@ -1,5 +1,6 @@
 // Ported unchanged from the website (frontend-next/src/lib), so a copied or
 // downloaded narration is the same from the app and from tehqeqatehadees.com.
+import { mendMixedDigits, spellSymbol, symbolKind } from '@tehqeqat/core';
 
 // Reading the stored research HTML as text.
 //
@@ -11,65 +12,17 @@
 // stray "l", so these helpers write the words out, or drop them where only
 // the bare name is wanted.
 
-// ARBO-DT: honorifics. Verified against the font's glyphs.
-export const HONORIFICS: Record<string, string> = {
-  l: 'رحمہ اللہ',
-  r: 'رضی اللہ عنہ',
-  R: 'رضی اللہ عنہا',
-  q: 'رضی اللہ عنہما',
-  p: 'رضی اللہ عنہم',
-  e: 'علیہ السلام',
-  E: 'علیہ الصلاۃ والسلام',
-  f: 'علیہم السلام',
-  s: 'ﷺ',
-  a: 'ﷺ',
-  b: 'رضی اللہ عنہ',
-  n: 'رحمہم اللہ',
-  m: 'رحمہما اللہ',
-};
-
-// ARBO-UW: numbers in a circle. The digits are 1-10 (0 is ⑩); the shifted
-// keys continue the count.
-const CIRCLED_KEYS = '1234567890!@#$%^&*()qwertyui';
-const CIRCLED_VALUES = [
-  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 19, 21, 22, 23, 24, 25, 26, 27,
-  28,
-];
-export const CIRCLED_NUMBERS: Record<string, number> = Object.fromEntries(
-  [...CIRCLED_KEYS].map((key, index) => [key, CIRCLED_VALUES[index]!]),
-);
-
-const HONORIFIC_CLASS = /font-class-ARBO-DT/;
-const NUMBER_CLASS = /font-class-(?:ARBO-U[WB]|ARBO-AB|Arbo-1|Arbo-Number-nasir)/;
-// Decorative dingbats and calligraphic ligatures with no text equivalent.
-const ORNAMENT_CLASS = /font-class-(?:\d-)?(?:ARBO|Arbo)/;
-
-export type SymbolKind = 'honorific' | 'number' | 'ornament' | null;
-
-export function symbolKind(className: string | null | undefined, tagName = 'span'): SymbolKind {
-  if (!className) return null;
-  if (HONORIFIC_CLASS.test(className)) return 'honorific';
-  // `font-class-Arbo-1` on a paragraph is just the paragraph's Word style.
-  if (NUMBER_CLASS.test(className)) return tagName.toLowerCase() === 'span' ? 'number' : null;
-  if (ORNAMENT_CLASS.test(className)) return tagName.toLowerCase() === 'span' ? 'ornament' : null;
-  return null;
-}
-
-export function spellSymbol(kind: SymbolKind, text: string): string {
-  if (kind === 'honorific') {
-    return [...text]
-      .map((ch) => HONORIFICS[ch] ?? '')
-      .filter(Boolean)
-      .join(' ');
-  }
-  if (kind === 'number') {
-    return [...text]
-      .map((ch) => (CIRCLED_NUMBERS[ch] ? `(${CIRCLED_NUMBERS[ch]})` : ''))
-      .filter(Boolean)
-      .join(' ');
-  }
-  return '';
-}
+// The symbol helpers (HONORIFICS, symbolKind, spellSymbol and the display's
+// spellSymbolsForReaders) moved to @tehqeqat/core/symbols, which every
+// display needs; they are re-exported here so this file reads as the website's.
+export {
+  CIRCLED_NUMBERS,
+  HONORIFICS,
+  spellSymbol,
+  spellSymbolsForReaders,
+  symbolKind,
+  type SymbolKind,
+} from '@tehqeqat/core';
 
 const SYMBOL_SPAN =
   /<span[^>]*class="([^"]*font-class-(?:\d-)?(?:ARBO|Arbo)[^"]*)"[^>]*>([\s\S]*?)<\/span>/g;
@@ -106,7 +59,7 @@ export function hadithPlainText(
 ) {
   if (!html) return '';
   return decodeEntities(
-    html
+    mendMixedDigits(html)
       .replace(SYMBOL_SPAN, (_match, className: string, inner: string) => {
         if (symbols === 'drop') return ' ';
         const text = decodeEntities(inner.replace(/<[^>]+>/g, ''));

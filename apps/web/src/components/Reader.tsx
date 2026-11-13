@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Link } from 'react-router';
 
-import { type HadithSection, normalize, queryTokens, stripHtml } from '@tehqeqat/core';
+import { type HadithSection, isRulingHeading, normalize, queryTokens, stripHtml } from '@tehqeqat/core';
 
 import { usePref } from '../hooks';
 import { fmt, t } from '../strings';
@@ -32,23 +32,30 @@ export interface StudyMark {
 }
 
 /**
- * Which sections are open. With a search query only the sections holding it
- * open (the website's bird's-eye view); `#s-<n>` in the address opens that
- * section and scrolls to it; printing opens everything.
+ * Which sections are open, as on the website (13 Nov 2026). A narration
+ * opens with its ruling (a heading that ends in «حکم») and any section
+ * holding the searched words; «صرف عنوانات» goes back to that, «مکمل تحقیق»
+ * opens everything. A narrator's page (`openAll`) opens with every section.
+ * `#s-<n>` in the address opens that section and scrolls to it; printing
+ * opens everything.
  */
-export function useSections(sections: HadithSection[], q: string, hash: string, offset = 0) {
+export function useSections(sections: HadithSection[], q: string, hash: string, offset = 0, openAll = false) {
   const tokens = useMemo(() => queryTokens(q), [q]);
   const matches = useMemo(
     () =>
       sections.map((s) => {
-        if (tokens.length === 0) return true;
+        if (openAll) return true;
+        if (isRulingHeading(s.heading)) return true;
+        if (tokens.length === 0) return false;
         const text = normalize(`${stripHtml(s.heading)} ${stripHtml(s.content)}`);
         return tokens.some((tok) => text.includes(tok));
       }),
-    [sections, tokens],
+    [sections, tokens, openAll],
   );
   const [open, setOpen] = useState<boolean[]>([]);
   useEffect(() => setOpen(matches), [matches]);
+  // Only a heading with text folds; a lone paragraph is always shown.
+  const folds = useMemo(() => sections.map((s) => Boolean(s.heading?.trim() && s.content?.trim())), [sections]);
 
   const contents = useMemo(
     () =>
@@ -76,8 +83,9 @@ export function useSections(sections: HadithSection[], q: string, hash: string, 
   }, [sections]);
 
   const foldable = contents.length > 1;
-  const allOpen = open.length > 0 && open.every(Boolean);
-  const setAll = (value: boolean) => setOpen(sections.map(() => value));
+  const allOpen = open.length > 0 && folds.every((f, i) => !f || open[i]);
+  /** «مکمل تحقیق» (true) or «صرف عنوانات» (false: the ruling and search matches, or nothing on a narrator's page). */
+  const setAll = (value: boolean) => setOpen(value ? sections.map(() => true) : openAll ? sections.map(() => false) : matches);
   return { matches, open, setOpen, contents, goTo, foldable, allOpen, setAll, offset };
 }
 
@@ -277,6 +285,64 @@ export function ResearchSections({
         return <Html key={i} html={heading || content} query={q} className="urdu prose" />;
       })}
     </div>
+  );
+}
+
+const MARK = /^\s*\[\s*([0-9۰-۹٠-٩]+)\s*\]\s*$/;
+const NOTE = /^\s*\[\s*([0-9۰-۹٠-٩]+)\s*\]/;
+
+/**
+ * «حوالہ جات», closed until the reader asks for it (the website since 13 Nov
+ * 2026). It opens by itself when it is needed: a footnote mark in the text
+ * («[1]») is tapped, which then goes to its note; the address ends in
+ * `#references`; or the page is printed.
+ */
+export function ReferencesBox({ html }: { html: string }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const box = ref.current;
+    if (!box) return undefined;
+    const open = () => {
+      box.open = true;
+    };
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (!target || box.contains(target) || !target.closest?.('.sections')) return;
+      // The mark is plain text in its own span: «[1]» (Word's dead link was removed).
+      let number: string | null = null;
+      for (let el: Element | null = target, i = 0; el && i < 3 && !number; el = el.parentElement, i++) {
+        number = MARK.exec(el.textContent ?? '')?.[1] ?? null;
+      }
+      if (!number) return;
+      const wanted = normalize(number);
+      const note = [...box.querySelectorAll('p')].find((p) => normalize(NOTE.exec(p.textContent ?? '')?.[1] ?? '') === wanted);
+      if (!note) return;
+      event.preventDefault();
+      open();
+      note.classList.add('note--hit');
+      setTimeout(() => note.classList.remove('note--hit'), 2500);
+      requestAnimationFrame(() => note.scrollIntoView({ block: 'center' }));
+    };
+    const onHash = () => {
+      if (location.hash === '#references') open();
+    };
+    onHash();
+    document.addEventListener('click', onClick, true);
+    window.addEventListener('hashchange', onHash);
+    window.addEventListener('beforeprint', open);
+    return () => {
+      document.removeEventListener('click', onClick, true);
+      window.removeEventListener('hashchange', onHash);
+      window.removeEventListener('beforeprint', open);
+    };
+  }, [html]);
+  return (
+    <details ref={ref} id="references" className="refs refs-box">
+      <summary>
+        <h2 className="section-title section-title--rule">{t.hadith.references}</h2>
+      </summary>
+      <Html html={html} className="urdu prose prose--small card" />
+    </details>
   );
 }
 

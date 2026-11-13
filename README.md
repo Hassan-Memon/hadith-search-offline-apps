@@ -68,7 +68,8 @@ tehqeqatehadees.com (unchanged)          GitHub Actions, every hour         the 
 
 Details: `packages/core/README.md`. What each release brought over from the
 website, with size and speed measurements: `docs/1.2.0-website-updates.md`,
-`docs/1.3.0-website-updates.md` (also the website's look).
+`docs/1.3.0-website-updates.md` (also the website's look),
+`docs/1.4.0-website-updates.md`.
 
 ## Repository layout
 

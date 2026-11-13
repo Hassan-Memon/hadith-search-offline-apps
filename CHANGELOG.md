@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-11-13 — 1.4.0: the website's updates of 12–13 November
+
+Details: `docs/1.4.0-website-updates.md`.
+
+- **Narration page:** opens with its ruling («روایت کا حکم») and any section
+  holding the searched words; «حوالہ جات» starts closed, and tapping a
+  footnote mark «[1]» opens it at that note. Footnote marks are small and
+  raised.
+- **Numbers and honorifics:** a number typed with two kinds of digit shows
+  in one kind; symbol-font honorifics are read and copied as words
+  («رحمہ اللہ»).
+- **Navigation like the website:** bottom bar صفحۂ اول، تلاش، احادیث، روات،
+  مزید; «ابواب» is a switch at the top of «تمام احادیث»; «اوپر جائیں» on long
+  pages; the site's name under the logo; the notice scrolls in one line.
+- **Home:** example searches, the numbers (910 روایات، 13 حصے، 16 کتب، 317
+  روات), «چند ابواب سے روایات» and «چند روات».
+- **تمام احادیث:** the parts of the series as number cards, other books as rows.
+- **کتب خانہ** is now the PDF library, as on the website: each book by name
+  with its cover, «دیکھیں» (online) and its narrations in the app.
+- **روات حدیث:** number tiles; in name order, groups by first letter with a
+  letter strip. A narrator's page lists the other narrators of the same
+  narrations.
+- Prefaces are no longer offered as related narrations or chapter samples.
+- Search on a phone: the note folds once there are results; filters side by side.
+- تعارف: part 2 is in the contents.
+
 ## 2026-11-13 — 1.3.1: where to download the books
 
 - **کتب خانہ** says where the books themselves are: the app lists each book's

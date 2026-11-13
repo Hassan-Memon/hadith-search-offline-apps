@@ -1,4 +1,7 @@
 // HTML helpers that work without a DOM (Expo, Node, Tauri WebView alike).
+import { mendMixedDigits } from './digits.js';
+import { normalize } from './normalize.js';
+import { spellSymbolsForReaders } from './symbols.js';
 import type { HadithSection } from './types.js';
 
 const ENTITIES: Record<string, string> = {
@@ -58,9 +61,16 @@ const ALLOWED_HREF = /^(?:https?:\/\/|mailto:|tel:|\/|#|\?)/i;
 /**
  * Render-time guard, identical in spirit to the website's sanitizeHadithHtml:
  * drops `file:///D:/…` footnote hrefs left by Word, and any active content.
+ * Like the website (13 Nov 2026), every display also shows a number typed
+ * with two kinds of digit in one kind (digits.ts) and gives each symbol-font
+ * honorific its words for screen readers and copying (symbols.ts).
  */
 export function sanitizeHadithHtml(html: string | null | undefined): string {
   if (!html) return '';
+  return spellSymbolsForReaders(mendMixedDigits(stripUnsafe(html)));
+}
+
+function stripUnsafe(html: string): string {
   return html
     .replace(HREF_ATTRIBUTE, (match, _q, dq, sq) => {
       const url = String(dq ?? sq ?? '').trim();
@@ -71,6 +81,20 @@ export function sanitizeHadithHtml(html: string | null | undefined): string {
     .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(/<o:p>|<\/o:p>/g, '')
     .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/g, '');
+}
+
+const RULING_END = normalize('حکم');
+
+/**
+ * The ruling on a narration is under a heading that ends in «حکم»: «روایت کا
+ * حکم», «تحقیق کا خلاصہ اور روایت کا حکم», «روایت بطریق … کا حکم» and their
+ * spellings without spaces (649 of the 910 narrations on 12 Nov 2026, the
+ * website's count). Marks, spaces and end punctuation are ignored; «حکماء»
+ * or «حکمی» do not match. The website opens these sections on arrival.
+ */
+export function isRulingHeading(heading: string | null | undefined): boolean {
+  if (!heading) return false;
+  return normalize(stripHtml(heading)).replace(/[\s:۔.،,؛\-–—]+/g, '').endsWith(RULING_END);
 }
 
 /** Parse the stored `html_content` JSON; tolerant of bad data. */

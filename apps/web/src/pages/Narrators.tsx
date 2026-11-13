@@ -16,8 +16,10 @@ import {
   listNarrators,
   type Narrator,
   type NarratorListItem,
+  narratorSortKey,
   narratorStudies,
   normalize,
+  relatedNarrators,
   parseSections,
   stripHtml,
 } from '@tehqeqat/core';
@@ -25,26 +27,25 @@ import {
 import { bookPath, hadithPath, narratorPath } from '../components/HadithCard';
 import { Html } from '../components/Html';
 import { Icon } from '../components/Icon';
-import { Contents, type ReaderAction, ReaderToolbar, ResearchSections, SectionTitle, useSections } from '../components/Reader';
+import {
+  Contents,
+  type ReaderAction,
+  ReaderToolbar,
+  ReferencesBox,
+  ResearchSections,
+  SectionTitle,
+  useSections,
+} from '../components/Reader';
 import { db } from '../db/client';
 import type { ExportMeta } from '../export';
 import { useQuery } from '../hooks';
 import { fmt, t } from '../strings';
-import { NarratorName } from './Hadith';
+import { NarratorCard, NarratorName, shuffled, StatTiles } from '../components/Narrator';
 
 const SHOWN = 60;
 const SUGGESTED = 6;
 
 type Sort = 'name' | 'death' | 'studies';
-
-function shuffled<T>(items: T[], count: number): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-  }
-  return copy.slice(0, count);
-}
 
 const sorters: Record<Sort, (a: NarratorListItem, b: NarratorListItem) => number> = {
   // The list already comes in the order of the Arabic names.
@@ -52,22 +53,6 @@ const sorters: Record<Sort, (a: NarratorListItem, b: NarratorListItem) => number
   death: (a, b) => (a.death_year ?? Infinity) - (b.death_year ?? Infinity),
   studies: (a, b) => b.study_count - a.study_count,
 };
-
-function NarratorCard({ n }: { n: NarratorListItem }) {
-  return (
-    <Link to={narratorPath(n.slug)} className="card narrator-card">
-      <span className="narrator-card__name">
-        <NarratorName n={n} />
-      </span>
-      {n.death_note && <span className="death-pill">{n.death_note}</span>}
-      {n.excerpt && <span className="narrator-card__excerpt urdu">{n.excerpt}</span>}
-      <span className="narrator-card__foot">
-        <span>{n.hadith_count === 1 ? 'ایک روایت میں تذکرہ' : t.narrators.inNarrations(n.hadith_count)}</span>
-        <span className="link-strong">{t.narrators.read} ←</span>
-      </span>
-    </Link>
-  );
-}
 
 export function NarratorsPage() {
   const all = useQuery(() => listNarrators(db), []);
@@ -102,6 +87,21 @@ export function NarratorsPage() {
     .sort(sorters[sort]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const suggestions = useMemo(() => shuffled(narrators, SUGGESTED), [narrators, round]);
+  // In name order the list is grouped by first letter, with a strip of the
+  // letters to jump (the website since 13 Nov 2026); every name is shown then.
+  const byLetter = sort === 'name';
+  const groups = useMemo(() => {
+    if (!byLetter) return [];
+    const out: { letter: string; items: NarratorListItem[] }[] = [];
+    for (const n of filtered) {
+      const letter = [...narratorSortKey(n)][0] ?? '؟';
+      if (out[out.length - 1]?.letter !== letter) out.push({ letter, items: [] });
+      out[out.length - 1]!.items.push(n);
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byLetter, filtered.map((n) => n.slug).join()]);
+  const centuryCount = centuries.length;
 
   if (all.data && narrators.length === 0) {
     return (
@@ -120,6 +120,13 @@ export function NarratorsPage() {
         <h1>{t.narrators.title}</h1>
         <p>{t.narrators.description}</p>
       </header>
+      <StatTiles
+        label={t.stats.label}
+        tiles={[
+          { value: narrators.length, label: t.stats.narrators, note: t.stats.narratorsNote },
+          ...(centuryCount > 0 ? [{ value: centuryCount, label: t.stats.centuries, note: t.stats.centuriesNote }] : []),
+        ]}
+      />
 
       <div className="searchbox searchbox--small">
         <span className="searchbox__icon" aria-hidden="true">
@@ -203,14 +210,49 @@ export function NarratorsPage() {
             : t.narrators.countOf(filtered.length, narrators.length)}
         </p>
         {filtered.length === 0 && narrators.length > 0 && <p className="empty">{t.narrators.noMatch}</p>}
-        <ul className="narrator-grid">
-          {filtered.slice(0, shown).map((n) => (
-            <li key={n.slug}>
-              <NarratorCard n={n} />
-            </li>
-          ))}
-        </ul>
-        {filtered.length > shown && (
+        {byLetter ? (
+          <>
+            {groups.length > 1 && (
+              <nav className="letters" aria-label={t.narrators.letters}>
+                {groups.map((g) => (
+                  <a
+                    key={g.letter}
+                    href={`#letter-${g.letter}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById(`letter-${g.letter}`)?.scrollIntoView({ block: 'start' });
+                    }}
+                  >
+                    {g.letter}
+                  </a>
+                ))}
+              </nav>
+            )}
+            {groups.map((g) => (
+              <div key={g.letter} className="letter-group">
+                <h3 id={`letter-${g.letter}`} className="letter-group__letter">
+                  {g.letter}
+                </h3>
+                <ul className="narrator-grid">
+                  {g.items.map((n) => (
+                    <li key={n.slug}>
+                      <NarratorCard n={n} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </>
+        ) : (
+          <ul className="narrator-grid">
+            {filtered.slice(0, shown).map((n) => (
+              <li key={n.slug}>
+                <NarratorCard n={n} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {!byLetter && filtered.length > shown && (
           <button type="button" className="btn btn--wide" onClick={() => setShown((s) => s + SHOWN)}>
             {t.list.loadMore}
           </button>
@@ -255,6 +297,7 @@ export function NarratorPage() {
   const narrator = useQuery(() => getNarrator(db, slug), [slug]);
   const n = narrator.data;
   const studies = useQuery(() => (n ? narratorStudies(db, n.slug) : Promise.resolve([])), [n?.slug]);
+  const related = useQuery(() => (n ? relatedNarrators(db, n.slug) : Promise.resolve([])), [n?.slug]);
   const ordered = useMemo(() => latestFirst(studies.data ?? [], studyLength), [studies.data]);
   const shown = ordered[0];
   const sections = useMemo(
@@ -271,7 +314,7 @@ export function NarratorPage() {
         : '',
     [shown, sections],
   );
-  const state = useSections(sections, '', hash, shown?.start ?? 0);
+  const state = useSections(sections, '', hash, shown?.start ?? 0, true);
   const [toast, setToast] = useState('');
   useEffect(() => {
     if (n) document.title = `${n.arabic_name || n.name} | ${t.appName}`;
@@ -380,12 +423,7 @@ export function NarratorPage() {
           <p className="muted">{t.narrators.intro(n.arabic_name || n.name)}</p>
           <Contents state={state} />
           <ResearchSections sections={sections} state={state} />
-          {references && (
-            <section className="refs">
-              <SectionTitle>{t.hadith.references}</SectionTitle>
-              <Html html={references} className="urdu prose prose--small card" />
-            </section>
-          )}
+          {references && <ReferencesBox html={references} />}
           <div className="study-source card">
             <p className="muted small">{t.narrators.fromNarration}</p>
             <Link to={hadithPath(shown.hadith.slug)} className="study__title">
@@ -409,6 +447,18 @@ export function NarratorPage() {
                   <Html as="span" html={s.hadith.title_html} className="urdu" />
                   <span className="related__book">{s.hadith.book}</span>
                 </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {related.data && related.data.length > 0 && (
+        <section className="section no-print">
+          <SectionTitle>{t.narrators.related(new Set(ordered.map((s) => s.hadith.id)).size)}</SectionTitle>
+          <ul className="narrator-grid">
+            {related.data.map((other) => (
+              <li key={other.slug}>
+                <NarratorCard n={other} excerpt={false} />
               </li>
             ))}
           </ul>

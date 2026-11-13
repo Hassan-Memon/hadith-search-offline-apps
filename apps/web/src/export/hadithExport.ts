@@ -10,6 +10,8 @@
 // numbers typed in a symbol font become words and digits (see hadithText.ts),
 // and Word's font classes become two real font names.
 import { type Block, type BlockKind, buildDocx, type Run, type Script } from './docx';
+import { mendMixedDigits } from '@tehqeqat/core';
+
 import { spellSymbol, symbolKind } from './hadithText';
 
 const ARABIC_CLASS =
@@ -57,6 +59,9 @@ function collectRuns(node: Node, inherited: Inherited, runs: Run[]) {
     runs.push({ ...inherited, text: '\n' });
     return;
   }
+  // Words added for screen readers next to a symbol: the symbol itself is
+  // spelled out below, so these would come twice.
+  if (element.hasAttribute('data-symbol-words')) return;
   const kind = symbolKind(element.getAttribute('class'), tag);
   if (kind) {
     const spelled = spellSymbol(kind, element.textContent ?? '');
@@ -106,7 +111,7 @@ function tidy(runs: Run[]): Run[] {
 /** The paragraphs of a fragment of stored HTML, as blocks of `kind`. */
 export function htmlToBlocks(html: string | undefined | null, kind: BlockKind): Block[] {
   if (!html || typeof DOMParser === 'undefined') return [];
-  const body = new DOMParser().parseFromString(html, 'text/html').body;
+  const body = new DOMParser().parseFromString(mendMixedDigits(html), 'text/html').body;
   const blocks: Block[] = [];
   let loose: Run[] = [];
   const flush = (center = false) => {
