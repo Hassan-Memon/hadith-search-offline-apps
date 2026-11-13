@@ -63,6 +63,10 @@ export const t = {
   books: {
     title: 'کتب خانہ',
     description: 'تحقیقاتِ حدیث کی مطبوعہ کتب اور ان کی روایات، ترتیب وار۔',
+    // The app has each book's narrations; the books themselves (PDF) are on the website.
+    downloadNote: 'مکمل کتابیں پڑھنے یا ڈاؤن لوڈ کرنے کے لیے ویب سائٹ کا کتب خانہ دیکھیں۔',
+    downloadLink: 'ویب سائٹ پر کتب خانہ کھولیں',
+    downloadOnline: 'اس کے لیے انٹرنیٹ درکار ہے۔',
     series: 'غیر معتبر روایات کا فنی جائزہ',
     seriesNote: 'تحقیقی سلسلے کے تمام حصے، ترتیب وار۔',
     others: 'دیگر کتب',
