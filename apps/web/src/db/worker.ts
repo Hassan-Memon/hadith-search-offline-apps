@@ -71,7 +71,14 @@ async function acquirePool(): Promise<void> {
         // and every retry fails too (supported, but missing from the types).
         const options = { name: VFS, initialCapacity: 4, forceReinitIfPreviouslyFailed: true };
         pool = await sqlite3!.installOpfsSAHPoolVfs(options as Parameters<Sqlite3['installOpfsSAHPoolVfs']>[0]);
-      } else if (pool.isPaused()) {
+      } else if (!sqlite3!.capi.sqlite3_vfs_find(VFS)) {
+        // Ask SQLite, not pool.isPaused(): that only counts the pool's file
+        // handles, and a failed unpause can leave some behind (they arrive
+        // after the failure cleared the list) while the VFS stays
+        // unregistered, so opening would fail with "no such vfs".
+        // pauseVfs() drops those stray handles; unpauseVfs() then takes them
+        // all again and registers the VFS.
+        pool.pauseVfs();
         await pool.unpauseVfs();
       }
       return;
@@ -97,7 +104,7 @@ function release() {
   if (memoryOnly) return; // nothing is shared; keep the in-memory data
   db?.close(); // an open transaction is rolled back
   db = null;
-  if (pool && !pool.isPaused()) pool.pauseVfs();
+  pool?.pauseVfs(); // also drops stray handles a failed unpause left behind
 }
 
 function rows(sql: string, params?: Bind) {
